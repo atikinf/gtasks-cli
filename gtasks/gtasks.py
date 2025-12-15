@@ -1,171 +1,233 @@
-from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-from json import dumps
-from datetime import datetime, timezone
-from random import choices
-from string import ascii_letters, ascii_uppercase, digits
-from os import path
+from __future__ import annotations
 
+from pathlib import Path
+from typing import Optional
+
+import configparser
 import pickle
-import argparse
 
-# If modifying these scopes, delete the file token.json.
-SCOPES = 'https://www.googleapis.com/auth/tasks'
-GOOGLE_APPLICATION_CREDENTIALS = '/home/user/nikita/Projects/gtasks-cli/gtasks/credentials.json'
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import Resource, build
 
-class TaskHelper(object):
-    """Allows easy interfacing with google-tasks api
+
+SCOPES: list[str] = ["https://www.googleapis.com/auth/tasks"]
+
+class TasksHelper:
+    """Helper for authenticating with Google Tasks and exposing a Tasks API client.
     Attributes:
-        self.service (api service) Service specific to this instance
-        self.tasklists (list of Jsons) Stores current tasklists
-        self.tasklist_ids (map String -> String) Maps tasklist names to their ids
+        _credentials_path: Path
+        _token_path: Path
+        _config_path: Path
+        _default_list_id: Optional[str]
+        _scopes: list[str]
+        _service: Resource - Google Tasks API client
     """
-    def __init__(self, token_path=""):
-        """Returns Resource object for authorized user
+
+    def __init__(
+        self,
+        credentials_path: str | Path = "credentials.json",
+        token_path: str | Path = "token.pickle",
+        config_path: str | Path = Path("~/.config/gtasks-cli/config.conf").expanduser(),
+        scopes: Optional[list[str]] = None,
+    ) -> None:
+        """Initialize the helper and create a Google Tasks API client.
+
         Args:
-            token_path (str): path to token.json. Default: ""
+            credentials_path: Path to the OAuth client credentials JSON file.
+            token_path: Path where the user token will be cached.
+            config_path: Path to the configuration file used for defaults.
+            scopes: Optional list of OAuth scopes to request. Defaults to
+                the Tasks scope if not provided.
         """
-        # Get credentials
-        creds = None
-        if path.exists('token.pickle'):
-            with open('token.pickle', 'rb') as token:
-                creds = pickle.load(token)
-        if not creds or not creds.valid:
-            creds = self._gen_token(creds)
-        self.service = build('tasks', 'v1', credentials=creds)
-        self.update_tasklists()
-        self.check_rep()
+        self._credentials_path: Path = Path(credentials_path)
+        self._token_path: Path = Path(token_path)
+        self._config_path: Path = Path(config_path)
+        # TODO: Read the config file to get the default task list id on initialization
+        self._default_list_id: Optional[str] = None 
+        self._scopes: list[str] = scopes if scopes is not None else SCOPES
 
+        creds: Credentials = self._load_credentials()
+        self._service: Resource = build("tasks", "v1", credentials=creds)
 
-    def _gen_token(self, creds):
-        """Lets user login and generates token"""
-        if creds and creds.expired and creds.refresh_token:
+    def set_default_tasklist(self) -> None:
+        """Interactively set a default task list and persist it to config.
+        """
+        tasklists_resource = self._service.tasklists()
+        response = tasklists_resource.list().execute()
+        items = response.get("items", [])
+
+        if not items:
+            print("No task lists found for this account.")
+            return
+
+        # TODO: Factor out the config file + other helpers to a separate class 
+        config = configparser.ConfigParser()
+        current_default_title: Optional[str] = None
+
+        if self._config_path.exists():
+            config.read(self._config_path)
+            if config.has_option("defaults", "default_tasklist_title"):
+                current_default_title = config.get(
+                    "defaults",
+                    "default_tasklist_title",
+                )
+            if config.has_option("defaults", "default_tasklist_id"):
+                self._default_list_id = config.get(
+                    "defaults",
+                    "default_tasklist_id",
+                )
+
+        print("Available task lists:")
+        for idx, tlist in enumerate(items, start=1):
+            title = tlist.get("title", "<untitled>")
+            print(f"{idx}. {title}")
+
+        choice_idx = self._prompt_index_choice(
+            items,
+            "Select a default task list",
+            current_default_title,
+        )
+
+        if choice_idx is None:
+            print("Aborted setting default task list.")
+            return
+
+        selected = items[choice_idx]
+        selected_id: str = selected["id"]
+        selected_title: str = selected.get("title", "")
+
+        if "defaults" not in config:
+            config["defaults"] = {}
+
+        config["defaults"]["default_tasklist_id"] = selected_id
+        config["defaults"]["default_tasklist_title"] = selected_title
+        self._default_list_id = selected_id
+
+        # Ensure parent directory exists (e.g. ~/.config/gtasks-cli)
+        self._config_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with self._config_path.open("w") as cfg_file:
+            config.write(cfg_file)
+
+        print(
+            f"Default task list set to '{selected_title}' "
+            f"(id: {selected_id}) and written to {self._config_path}"
+        )
+
+    def list_tasklists(self, n: Optional[int] = None) -> None:
+        """Print first ``n`` task lists (all if ``n`` is not given).
+        """
+        tasklists_resource = self._service.tasklists()
+        response = tasklists_resource.list().execute()
+        items = response.get("items", [])
+
+        if not items:
+            print("No task lists found for this account.")
+            return
+
+        limit = n if n is not None else len(items)
+        print(f"Showing first {limit} task lists:")
+
+        for idx, tlist in enumerate(items[:limit], start=1):
+            title = tlist.get("title", "<untitled>")
+            list_id = tlist.get("id", "")
+            default_suffix = " [DEFAULT]" if list_id == self._default_list_id else ""
+            print(f"{idx}. {title}{default_suffix} (id: {list_id})")
+
+    def list_tasks(
+        self,
+        tasklist_id: Optional[str] = None,
+        n: Optional[int] = None,
+    ) -> None:
+        """Print first ``n`` tasks from the given task list (all if ``n`` is not given).
+        """
+        effective_tasklist_id: Optional[str] = tasklist_id or self._default_list_id
+
+        if effective_tasklist_id is None:
+            print(
+                # TODO: Replace with the CLI command when implemented.
+                "No task list id provided and no default task list is configured. "
+                "Use `set_default_tasklist` or pass a tasklist_id."
+            )
+            return
+
+        tasks_resource = self._service.tasks()
+        response = tasks_resource.list(tasklist=effective_tasklist_id).execute()
+        items = response.get("items", [])
+
+        if not items:
+            print(f"No tasks found for task list id '{effective_tasklist_id}'.")
+            return
+
+        limit = n if n is not None else len(items)
+        print(f"Showing first {limit} tasks from task list '{effective_tasklist_id}':")
+
+        for idx, task in enumerate(items[:limit], start=1):
+            title = task.get("title", "<untitled>")
+            status = task.get("status", "unknown")
+            print(f"{idx}. {title} [status: {status}]")
+
+    def _load_credentials(self) -> Credentials:
+        """Load existing credentials or perform an OAuth2 login flow."""
+        creds: Optional[Credentials] = None
+
+        if self._token_path.exists():
+            with self._token_path.open("rb") as token_file:
+                creds = pickle.load(token_file)
+
+        if creds and creds.valid:
+            return creds
+        elif creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
+                str(self._credentials_path),
+                self._scopes,
+            )
+            # Uses a local web server and browser-based consent screen.
             creds = flow.run_local_server()
-        # Save the credentials for the next run
-        with open('token.pickle', 'wb') as token:
-            pickle.dump(creds, token)
+
+        with self._token_path.open("wb") as token_file:
+            pickle.dump(creds, token_file)
+
         return creds
 
+    def _prompt_index_choice(
+        self,
+        items: list,
+        prompt_prefix: str,
+        current_hint: Optional[str] = None,
+    ) -> Optional[int]:
+        """Prompt user to select an item from a numbered list.
 
-    def check_rep(self):
-        assert self.service is not None, "Uninitialized service"
-        assert self.tasklists_json is not None, "Uninitialized store of tasklists"
-
-
-    def update_tasklists(self):
-        self.tasklists_json = self.service.tasklists().list().execute()
-        self.tasklist_ids = {}
-        tasklists = self.tasklists_json.get('items', [])
-        for t_list in tasklists:
-            # Potential ToDo, although kinda silly
-            if t_list['title'] in self.tasklist_ids:
-                raise ValueError("Can't handle two identically named tasklists.")
-            self.tasklist_ids[t_list['title']] = t_list['id']
-
-
-    def print_tasks(self):
-        """Prints hierarchy of tasklists/tasks/subtasks"""
-        self.check_rep()
-        self.update_tasklists()
-        task_lists = self.tasklists_json.get('items', [])
-        tasks_request = self.service.tasks()
-
-        for t_list in task_lists:
-            print('{0}'.format(t_list['title']))
-            curr_tasks_json = tasks_request.list(tasklist=t_list['id'], showCompleted=False)
-            curr_tasks = curr_tasks_json.execute().get('items', [])
-            padding = '  '
-            # ToDo: Currently counts blank tasks as tasks. Check for empty titles
-            if len(curr_tasks) == 0:
-                print('{}(empty)'.format(padding))
-            for task in curr_tasks:
-                block = 25
-                if 'parent' in task:
-                    padding = '    '
-                    block -= 2
-                print('{0}{1:<{2}}'.format(padding, task['title'], block))
-        self.check_rep()
-
-
-    def add_task(self, tasklist_title, text, parent=None):
-        """Adds given task to given tasklist
         Args:
-            tasklist (str): name of tasklist under which to insert task
-            text (str): text of the task
-            parent (str): id of parent task
+            items: List of items to choose from.
+            prompt_prefix: e.g., "Select a default task list".
+            current_hint: Optional hint to display about the current selection.
+
+        Returns:
+            0-based index of the selected item, or None if the user cancelled.
         """
-        self.check_rep()
-        # Generating task json
-        # Currently not worried about security for etag or id_suffix. Potential ToDo
-        local_time = datetime.now(timezone.utc).astimezone()
-        etag = ''.join(choices(ascii_uppercase + digits, k=6))
-        id_suffix = ''.join(choices(ascii_letters, k=5))
+        while True:
+            hint_suffix = f" (current: {current_hint})" if current_hint else ""
+            choice_str = input(
+                f"{prompt_prefix} [1-{len(items)}]{hint_suffix} "
+                "(or 'q' to cancel): "
+            ).strip()
 
-        new_task = {'status': 'needsAction',
-                    'kind': 'tasks#task',
-                    'updated': local_time.isoformat(),
-                    'links': [],
-                    'title': text,
-                    'deleted': False,
-                    'etag': etag,
-                    'hidden': False,
-                    'id': text + id_suffix}
-        if parent is not None:
-            new_task['parent'] = parent
-        new_task_json = dumps(new_task)
+            if choice_str.lower() in {"q", "quit"}:
+                return None
 
-        tasklist_id = self.tasklist_ids[tasklist_title]
-        print("Adding task to: {}".format(tasklist_title))
-        tasks_request = self.service.tasks()
-        request = tasks_request.insert(tasklist=tasklist_id, body=new_task_json)
-        request.execute() 
-        self.check_rep()
+            if not choice_str.isdigit():
+                print("Please enter a number or 'q' to cancel.")
+                continue
+
+            choice = int(choice_str)
+            if 1 <= choice <= len(items):
+                return choice - 1  # Convert to 0-based index
+
+            print(f"Please choose a number between 1 and {len(items)}.")
 
 
-def handle_args(task_helper, args):
-    """Handles given args. Assumes args are valid
-    Args:
-        task_helper (TaskHelper): Passed TaskHelper
-        args (Namespace): Passed arguments
-    """
-    tlist, task, parent = args.tlist, args.task, args.parent
-    show = args.show
-
-    if show:
-        task_helper.print_tasks()
-    if task:
-        task_helper.add_task(tlist, task, parent)
-
-def validate_args(parser, args):
-    if args.tlist and args.task is None:
-        parser.error('--list (-l) requires --task (-t)')
-    if args.task and args.tlist is None:
-        parser.error('--task (-t) requres --list (-l)')
-    if args.parent and args.task is None:
-        parser.error('--parent (-p) requres --task (-t)')
-
-
-def main():
-    parser = argparse.ArgumentParser(description='Parse gtasks_cli args')
-    # ToDo Allow script to remember previously used tasklist and use as default
-    parser.add_argument('-l', '--list', dest='tlist', help='Parent list for added task')
-    parser.add_argument('-t', '--task', dest='task', help='Add a task')
-    parser.add_argument('-p', '--parent', dest='parent', help='Add a task under a parent task')
-    parser.add_argument('-s', '--show', dest='show', action='store_true', help='Print current existing task list')
-
-    args = parser.parse_args()
-    validate_args(parser, args)
-
-    token_path = ""
-    task_helper = TaskHelper(token_path)
-
-    handle_args(task_helper, args)
-
-
-if __name__ == '__main__':
-    main()
