@@ -12,13 +12,17 @@ from gtasks.tasks_helper import TasksHelper
 def cmd_list_tasks(args: argparse.Namespace) -> None:
     """Handle the 'list' command to display tasks."""
     helper = TasksHelper()
-    helper.list_tasks(tasklist_id=args.tasklist_id, n=args.limit)
+    helper.list_tasks(
+        tasklist_id=args.tasklist_id,
+        tasklist_title=args.tasklist_title,
+        n=args.limit,
+    )
 
 
 def cmd_list_tasklists(args: argparse.Namespace) -> None:
     """Handle the 'lists' command to display task lists."""
     helper = TasksHelper()
-    helper.list_tasklists(n=args.limit)
+    helper.list_tasklists(n=args.limit, show_ids=args.show_ids)
 
 
 def cmd_set_default(args: argparse.Namespace) -> None:
@@ -46,11 +50,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="List tasks from a task list",
         description="Display tasks from the specified or default task list.",
     )
-    list_parser.add_argument(
+    tasklist_group = list_parser.add_mutually_exclusive_group()
+    tasklist_group.add_argument(
         "-t", "--tasklist-id",
         type=str,
         default=None,
         help="ID of the task list to show tasks from (uses default if not specified)",
+    )
+    tasklist_group.add_argument(
+        "-T", "--tasklist-title",
+        type=str,
+        default=None,
+        help="Title of the task list to show tasks from (uses default if not specified)",
     )
     list_parser.add_argument(
         "-n", "--limit",
@@ -71,6 +82,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help="Maximum number of task lists to display",
+    )
+    lists_parser.add_argument(
+        "--show-ids",
+        action="store_true",
+        default=False,
+        help="Include task list IDs in the output",
     )
     lists_parser.set_defaults(func=cmd_list_tasklists)
 

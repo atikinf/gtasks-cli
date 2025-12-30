@@ -3,8 +3,8 @@
 Putting together a simple Google Tasks CLI to make it easier to stay in the terminal and to re-familiarize myself with type hinted Python. 
 
 **TODO**:
-* Add an [ID -> Title, ETag] cache, stored as a pickle/json in the .config/gtasks-cli dir. Read each time a command is run. Can check against ETag to invlidate cache elements.
-* Add tab-autocomplete that leverages the above cache.
+* Add unit testing for the tasks helper
+* Add tab-autocomplete that leverages the tasklists cache
 
 * Add doc explaining how to download/configure a credentials.json file for new users. À la [gcalcli](https://github.com/insanum/gcalcli/blob/HEAD/docs/api-auth.md).
 
