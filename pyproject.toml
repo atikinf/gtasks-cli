@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gtasks-cli"
+version = "0.1.0"
+description = "Google Tasks Command Line Interface"
+readme = "README.md"
+requires-python = ">= 3.14"
+license = { text = "MIT" }
+authors = [
+    { name = "Nikita Filippov" },
+]
+dependencies = [
+    "google-auth>=2.41",
+    "google-auth-oauthlib>=1.2",
+    "google-api-python-client>=2.187",
+]
+
+# entry
+[project.scripts]
+gtasks = "gtasks.cli:main"

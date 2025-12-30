@@ -44,9 +44,9 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
     )
 
-    # 'list' subcommand - list tasks
+    # 'tasks' subcommand - list tasks
     list_parser = subparsers.add_parser(
-        "list",
+        "tasks",
         help="List tasks from a task list",
         description="Display tasks from the specified or default task list.",
     )
