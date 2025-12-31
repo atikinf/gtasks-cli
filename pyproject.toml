@@ -21,6 +21,11 @@ dependencies = [
 [project.scripts]
 gtasks = "gtasks.cli:main"
 
+# uv looks in src/gtasks_cli/__init__.py by default
+[tool.uv.build-backend]
+module-root = ""
+module-name = "gtasks"
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
