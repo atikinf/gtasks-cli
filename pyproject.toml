@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=80"]
-build-backend = "setuptools.build_meta"
+requires = ["uv_build >= 0.9.21, <0.10.0"]
+build-backend = "uv_build"
 
 [project]
 name = "gtasks-cli"
@@ -18,6 +18,10 @@ dependencies = [
     "google-api-python-client>=2.187",
 ]
 
-# entry
 [project.scripts]
 gtasks = "gtasks.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
