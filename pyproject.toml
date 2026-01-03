@@ -16,6 +16,8 @@ dependencies = [
     "google-auth>=2.41",
     "google-auth-oauthlib>=1.2",
     "google-api-python-client>=2.187",
+    "bidict>=0.23.1",
+    "pytest-mock>=3.15.1",
 ]
 
 [project.scripts]
