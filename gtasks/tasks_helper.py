@@ -1,33 +1,31 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Optional
-
 import configparser
 import pickle
+from pathlib import Path
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import Resource, build
 
-from gtasks.tasklist_cache import TaskListCache
-
+from gtasks.defaults import CONFIG_DIR
 
 SCOPES: list[str] = ["https://www.googleapis.com/auth/tasks"]
 
-# Default config directory: ~/.config/gtasks-cli/
-CONFIG_DIR: Path = Path("~/.config/gtasks-cli").expanduser()
+"""
+    IGNORE, BROKEN AF!!! Will be fixed shortly
+"""
 
 
 class TasksHelper:
-    """Helper for authenticating with Google Tasks and exposing a Tasks API client. 
+    """Helper for authenticating with Google Tasks and exposing a Tasks API client.
 
     Attributes:
         _credentials_path: Path
         _token_path: Path
         _config_path: Path
-        _default_list_id: Optional[str]
+        _default_list_id: str | None
         _scopes: list[str]
         _service: Resource - Google Tasks API client
         _tasklist_cache: TaskListCache - Cache for tasklist ID to title mappings
@@ -38,7 +36,7 @@ class TasksHelper:
         credentials_path: str | Path = CONFIG_DIR / "credentials.json",
         token_path: str | Path = CONFIG_DIR / "token.pickle",
         config_path: str | Path = CONFIG_DIR / "config.conf",
-        scopes: Optional[list[str]] = None,
+        scopes: list[str] | None = None,
     ) -> None:
         """Initialize the helper and create a Google Tasks API client.
 
@@ -52,12 +50,12 @@ class TasksHelper:
         self._credentials_path: Path = Path(credentials_path)
         self._token_path: Path = Path(token_path)
         self._config_path: Path = Path(config_path)
-        self._default_list_id: Optional[str] = self._load_default_list_id()
+        self._default_list_id: str | None = self._load_default_list_id()
         self._scopes: list[str] = scopes if scopes is not None else SCOPES
         self._tasklist_cache: TaskListCache = TaskListCache()
 
         creds: Credentials = self._load_credentials()
-        
+
         self._service: Resource = build("tasks", "v1", credentials=creds)
 
     def set_default_tasklist(self) -> None:
@@ -69,7 +67,7 @@ class TasksHelper:
             return
 
         config = configparser.ConfigParser()
-        current_default_title: Optional[str] = None
+        current_default_title: str | None = None
 
         if self._config_path.exists():
             config.read(self._config_path)
@@ -77,11 +75,6 @@ class TasksHelper:
                 current_default_title = config.get(
                     "defaults",
                     "default_tasklist_title",
-                )
-            if config.has_option("defaults", "default_tasklist_id"):
-                self._default_list_id = config.get(
-                    "defaults",
-                    "default_tasklist_id",
                 )
 
         print("Available task lists:")
@@ -124,7 +117,7 @@ class TasksHelper:
 
     def list_tasklists(
         self,
-        n: Optional[int] = None,
+        n: int | None = None,
         show_ids: bool = False,
     ) -> None:
         """Print first ``n`` task lists (all if ``n`` is not given).
@@ -151,9 +144,9 @@ class TasksHelper:
 
     def list_tasks(
         self,
-        tasklist_id: Optional[str] = None,
-        tasklist_title: Optional[str] = None,
-        n: Optional[int] = None,
+        tasklist_id: str | None = None,
+        tasklist_title: str | None = None,
+        n: int | None = None,
     ) -> None:
         """Print first ``n`` tasks from the given task list (all if ``n`` is not given).
 
@@ -174,7 +167,7 @@ class TasksHelper:
             )
             return
 
-        effective_tasklist_id: Optional[str] = None
+        effective_tasklist_id: str | None = None
 
         if tasklist_title is not None:
             effective_tasklist_id = self._resolve_tasklist_id_from_title(tasklist_title)
@@ -216,7 +209,7 @@ class TasksHelper:
             status = task.get("status", "unknown")
             print(f"{idx}. {title} [status: {status}]")
 
-    def _load_default_list_id(self) -> Optional[str]:
+    def _load_default_list_id(self) -> str | None:
         """Load the default task list ID from config file if it exists."""
         if not self._config_path.exists():
             return None
@@ -240,7 +233,7 @@ class TasksHelper:
         self._tasklist_cache.update_from_api_response(response)
         return response.get("items", [])
 
-    def _resolve_tasklist_id_from_title(self, title: str) -> Optional[str]:
+    def _resolve_tasklist_id_from_title(self, title: str) -> str | None:
         """Look up tasklist ID by title, fetching from API on cache miss.
 
         Args:
@@ -257,7 +250,7 @@ class TasksHelper:
 
     def _load_credentials(self) -> Credentials:
         """Load existing credentials or perform an OAuth2 login flow."""
-        creds: Optional[Credentials] = None
+        creds: Credentials | None = None
 
         if self._token_path.exists():
             with self._token_path.open("rb") as token_file:
@@ -287,8 +280,8 @@ class TasksHelper:
         self,
         items: list,
         prompt_prefix: str,
-        current_hint: Optional[str] = None,
-    ) -> Optional[int]:
+        current_hint: str | None = None,
+    ) -> int | None:
         """Prompt user to select an item from a numbered list.
 
         Args:
@@ -302,8 +295,7 @@ class TasksHelper:
         while True:
             hint_suffix = f" (current: {current_hint})" if current_hint else ""
             choice_str = input(
-                f"{prompt_prefix} [1-{len(items)}]{hint_suffix} "
-                "(or 'q' to cancel): "
+                f"{prompt_prefix} [1-{len(items)}]{hint_suffix} (or 'q' to cancel): "
             ).strip()
 
             if choice_str.lower() in {"q", "quit"}:
@@ -318,4 +310,3 @@ class TasksHelper:
                 return choice - 1  # Convert to 0-based index
 
             print(f"Please choose a number between 1 and {len(items)}.")
-
