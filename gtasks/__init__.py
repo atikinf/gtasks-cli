@@ -2,6 +2,5 @@
 __version__ = "0.1.0"
 
 from gtasks.cli import main
-from gtasks.tasks_helper import TasksHelper
 
-__all__ = ["main", "TasksHelper", "__version__"]
+__all__ = ["main", "__version__"]

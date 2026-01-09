@@ -18,6 +18,8 @@ dependencies = [
     "google-api-python-client>=2.187",
     "bidict>=0.23.1",
     "pytest-mock>=3.15.1",
+    "google-api-python-client-stubs>=1.31.0",
+    "ty>=0.0.9",
 ]
 
 [project.scripts]
