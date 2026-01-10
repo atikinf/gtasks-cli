@@ -23,7 +23,7 @@ dependencies = [
 ]
 
 [project.scripts]
-gtasks = "gtasks.cli:main"
+gtasks = "gtasks.app:main"
 
 # uv looks in src/gtasks_cli/__init__.py by default
 [tool.uv.build-backend]

@@ -12,6 +12,7 @@ class BidictCache[K, V](bidict[K, V]):
     def __init__(self, cache_path: Path | None = None) -> None:
         super().__init__()
 
+        # conditional necessary to avoid sub/superclass initialization errors
         if cache_path is not None:
             self._cache_path: Path = cache_path.expanduser()
             self.load()

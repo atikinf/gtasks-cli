@@ -6,6 +6,10 @@ DEFAULT_TASKLIST_TITLE: str = "default_tasklist_title"
 
 
 class Config:
+    """
+    Simple config file manager
+    """
+
     def __init__(
         self,
         config_path: Path,

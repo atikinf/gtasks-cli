@@ -1,41 +1,38 @@
+"""Factory functions for building API clients and services."""
+
 import pickle
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from google.auth.transport import Request
+from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
-from gtasks.utils.defaults import CONFIG_PATH
+from gtasks.client.cached_api_client import CachedApiClient
+from gtasks.defaults import APP_CFG_PATH, CACHE_FILE_PATH
+from gtasks.utils.bidict_cache import BidictCache
 
 if TYPE_CHECKING:
     from googleapiclient._apis.tasks.v1.resources import TasksResource
-    from googleapiclient._apis.tasks.v1.schemas import TaskList
 
 
 SCOPES: list[str] = ["https://www.googleapis.com/auth/tasks"]
 
 
-def tasklist_list_to_title_id_map(tasklists: list[TaskList]):
-    title_id_map: dict[str, str] = {}
-    for tasklist in tasklists:
-        title: str | None = tasklist.get("title")
-        id_: str | None = tasklist.get("id")
-        if title is not None and id_ is not None:
-            title_id_map[title] = id_
-        else:
-            raise ValueError("Cannot parse tasklist with empty id and title.")
-    return title_id_map
-
-
-def build_tasks_service(
-    token_path: Path = CONFIG_PATH / "token.pickle",
-    creds_path: Path = CONFIG_PATH / "credentials.json",
-) -> TasksResource:
+def build_tasks_resource(
+    token_path: Path = APP_CFG_PATH / "token.pickle",
+    creds_path: Path = APP_CFG_PATH / "credentials.json",
+) -> "TasksResource":
+    """Build and return a Google Tasks API resource."""
     creds: Credentials = _load_credentials(token_path, creds_path)
-
     return build("tasks", "v1", credentials=creds)
+
+
+def build_cached_client() -> CachedApiClient:
+    """Build and return a CachedApiClient instance with cache."""
+    cache: BidictCache[str, str] = BidictCache(CACHE_FILE_PATH)
+    return CachedApiClient(build_tasks_resource(), cache)
 
 
 def _load_credentials(
