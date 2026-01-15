@@ -35,7 +35,7 @@ class Config:
         if section not in self._parser:
             return None
 
-        return self._parser[section][DEFAULT_TASKLIST_TITLE]
+        return self._parser[section].get(DEFAULT_TASKLIST_TITLE)
 
     def _save(self) -> None:
         """Write current config to disk."""

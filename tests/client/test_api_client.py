@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from gtasks.api_client import ApiClient
+from gtasks.client.api_client import ApiClient
 
 
 @pytest.fixture

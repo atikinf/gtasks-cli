@@ -17,3 +17,13 @@ def tasklist_list_to_title_id_map(tasklists: list[TaskList]) -> dict[str, str]:
         else:
             raise ValueError("Cannot parse tasklist with empty id and title.")
     return title_id_map
+
+
+def resolve_tasklist_id(tasklist_title: str, tasklists: list) -> list[str]:
+    matching_ids: list[str] = []
+    for tasklist in tasklists:
+        cur_title = tasklist.get("title")
+        cur_id = tasklist.get("id")
+        if tasklist_title == cur_title and cur_id is not None:
+            matching_ids.append(cur_id)
+    return matching_ids

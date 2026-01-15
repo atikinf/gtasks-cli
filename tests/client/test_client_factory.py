@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
-from gtasks.client_factory import _load_credentials
+from gtasks.client.client_factory import load_credentials
 
 
 class TestLoadCredentials:
@@ -31,7 +31,7 @@ class TestLoadCredentials:
         creds.refresh_token = "refresh_token_value"
         return creds
 
-    @patch("gtasks.client_factory.pickle")
+    @patch("gtasks.client.client_factory.pickle")
     def test_load_credentials_GIVEN_valid_cached_token_THEN_returns_cached_creds(
         self,
         mock_pickle: MagicMock,
@@ -45,12 +45,12 @@ class TestLoadCredentials:
             patch.object(Path, "exists", return_value=True),
             patch.object(Path, "open", mock_open()),
         ):
-            result = _load_credentials(token_path, creds_path)
+            result = load_credentials(token_path, creds_path)
 
         assert result == valid_creds
         mock_pickle.dump.assert_not_called()  # Valid creds don't need re-saving
 
-    @patch("gtasks.client_factory.pickle")
+    @patch("gtasks.client.client_factory.pickle")
     def test_load_credentials_GIVEN_expired_creds_with_refresh_token_THEN_refreshes_and_saves(
         self,
         mock_pickle: MagicMock,
@@ -65,14 +65,14 @@ class TestLoadCredentials:
             patch.object(Path, "open", mock_open()),
             patch.object(Path, "mkdir"),
         ):
-            result = _load_credentials(token_path, creds_path)
+            result = load_credentials(token_path, creds_path)
 
         expired_creds_with_refresh_token.refresh.assert_called_once()
         mock_pickle.dump.assert_called_once()
         assert result == expired_creds_with_refresh_token
 
-    @patch("gtasks.client_factory.InstalledAppFlow")
-    @patch("gtasks.client_factory.pickle")
+    @patch("gtasks.client.client_factory.InstalledAppFlow")
+    @patch("gtasks.client.client_factory.pickle")
     def test_load_credentials_GIVEN_no_cached_token_THEN_runs_oauth_flow(
         self,
         mock_pickle: MagicMock,
@@ -90,7 +90,7 @@ class TestLoadCredentials:
             patch.object(Path, "open", mock_open()),
             patch.object(Path, "mkdir"),
         ):
-            result = _load_credentials(token_path, creds_path)
+            result = load_credentials(token_path, creds_path)
 
         mock_flow_class.from_client_secrets_file.assert_called_once_with(
             str(creds_path),
@@ -100,8 +100,8 @@ class TestLoadCredentials:
         mock_pickle.dump.assert_called_once()
         assert result == new_creds
 
-    @patch("gtasks.client_factory.InstalledAppFlow")
-    @patch("gtasks.client_factory.pickle")
+    @patch("gtasks.client.client_factory.InstalledAppFlow")
+    @patch("gtasks.client.client_factory.pickle")
     def test_load_credentials_GIVEN_invalid_cached_creds_THEN_runs_oauth_flow(
         self,
         mock_pickle: MagicMock,
@@ -125,12 +125,12 @@ class TestLoadCredentials:
             patch.object(Path, "open", mock_open()),
             patch.object(Path, "mkdir"),
         ):
-            result = _load_credentials(token_path, creds_path)
+            result = load_credentials(token_path, creds_path)
 
         mock_flow.run_local_server.assert_called_once()
         assert result == new_creds
 
-    @patch("gtasks.client_factory.pickle")
+    @patch("gtasks.client.client_factory.pickle")
     def test_load_credentials_GIVEN_nested_token_path_THEN_creates_parent_dirs(
         self, mock_pickle: MagicMock, creds_path: Path
     ) -> None:
@@ -146,11 +146,11 @@ class TestLoadCredentials:
             patch.object(Path, "open", mock_open()),
             patch.object(Path, "mkdir") as mock_mkdir,
         ):
-            _load_credentials(nested_token_path, creds_path)
+            load_credentials(nested_token_path, creds_path)
 
         mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
-    @patch("gtasks.client_factory.pickle")
+    @patch("gtasks.client.client_factory.pickle")
     def test_load_credentials_GIVEN_refreshed_creds_THEN_persists_to_file(
         self,
         mock_pickle: MagicMock,
@@ -165,7 +165,7 @@ class TestLoadCredentials:
             patch.object(Path, "open", mock_open()) as m_open,
             patch.object(Path, "mkdir"),
         ):
-            _load_credentials(token_path, creds_path)
+            load_credentials(token_path, creds_path)
 
         # Verify pickle.dump was called with the creds and the file handle
         mock_pickle.dump.assert_called_once()

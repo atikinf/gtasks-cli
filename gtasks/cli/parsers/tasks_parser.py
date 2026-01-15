@@ -2,60 +2,47 @@
 
 import argparse
 import sys
+from functools import partial
 
-from gtasks.client.client_factory import build_cached_client
+from gtasks.cli.cli_utils import print_tasks, prompt_choose_tasklist_id
+from gtasks.client.api_client import ApiClient
+from gtasks.client.client_utils import resolve_tasklist_id
+from gtasks.utils.config import Config
 
 
-def cmd_list_tasks(args: argparse.Namespace) -> None:
+def cmd_list_tasks(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
     """Handle the 'list' command to display tasks."""
-    has_id = args.tasklist_id is not None
-    has_title = args.tasklist_title is not None
-    if has_id == has_title:
+    tasklist_title: None | str = args.tasklist_title or cfg.get_tasklist_title()
+    if tasklist_title is None:
         print(
-            "Error: You must specify exactly one of --tasklist-id (-t) or "
-            "--tasklist-title (-T)"
+            "Error: You must specify a --tasklist-title (-t) or set a default tasklist"
         )
         sys.exit(1)
+        return
+    tasks = []
 
-    client = build_cached_client()
+    tasklists: list = client.get_tasklists()
+    ids: list[str] = resolve_tasklist_id(tasklist_title, tasklists)
 
-    if has_id:
-        tasks = client.get_tasks(args.tasklist_id, args.limit)
+    id_ = prompt_choose_tasklist_id(ids, tasklists, tasklist_title)
+    if id_ is not None:
+        tasks = client.get_tasks(id_, args.limit)
     else:
-        tasks = client.get_tasks_by_title(args.tasklist_title, args.limit)
-    for task in tasks:
-        title: str = task.get("title", "<no title>")
-        notes = task.get("notes")
-        due = task.get("due")
-        if args.show_ids:
-            task_id = task.get("id", "<no id>")
-            print(f"- [{task_id}] {title}", end="")
-        else:
-            print(f"- {title}", end="")
-        if due:
-            print(f" (Due: {due})", end="")
-        print()
-        if notes:
-            print(f"    Notes: {notes}")
+        print(f"Couldn't find a tasklist named {tasklist_title}")
+
+    print(f"==[{tasklist_title}]==")
+    print_tasks(tasks, args)
 
 
-def add_tasks_subparser(subparsers) -> None:
+def add_subparser_tasks(subparsers, client: ApiClient, cfg: Config) -> None:
     """Add the 'tasks' subcommand to list tasks."""
     tasks_parser = subparsers.add_parser(
         "tasks",
         help="List tasks from a task list",
         description="Display tasks from the specified or default task list.",
     )
-    tasklist_group = tasks_parser.add_mutually_exclusive_group()
-    tasklist_group.add_argument(
-        "-t",
-        "--tasklist-id",
-        type=str,
-        default=None,
-        help="ID of the task list to show tasks from (uses default if not specified)",
-    )
-    tasklist_group.add_argument(
-        "-T",
+    tasks_parser.add_argument(
+        "-l",
         "--tasklist-title",
         type=str,
         default=None,
@@ -73,4 +60,4 @@ def add_tasks_subparser(subparsers) -> None:
         action="store_true",
         help="Include task IDs in output",
     )
-    tasks_parser.set_defaults(func=cmd_list_tasks)
+    tasks_parser.set_defaults(func=partial(cmd_list_tasks, client=client, cfg=cfg))

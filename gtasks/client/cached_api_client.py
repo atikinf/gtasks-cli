@@ -13,9 +13,10 @@ SCOPES: list[str] = ["https://www.googleapis.com/auth/tasks"]
 
 if TYPE_CHECKING:
     from googleapiclient._apis.tasks.v1.resources import TasksResource
-    from googleapiclient._apis.tasks.v1.schemas import Task, TaskList
+    from googleapiclient._apis.tasks.v1.schemas import TaskList
 
 
+# TODO: Unused. Needs refining. When to refresh/invalidate cache?
 class CachedApiClient(ApiClient):
     def __init__(
         self,
@@ -36,17 +37,10 @@ class CachedApiClient(ApiClient):
 
         return tasklists
 
-    def get_tasks_by_title(
+    @override
+    def resolve_tasklist_id(
         self,
         tasklist_title: str,
-        max_results: int | None = None,
-    ) -> list["Task"]:
-        resolved_tasklist_id = self._resolve_tasklist_id(tasklist_title)
-        return super().get_tasks(resolved_tasklist_id, max_results)
-
-    def _resolve_tasklist_id(
-        self,
-        tasklist_title: str,
-    ) -> str:
+    ) -> list[str]:
         """Resolve a tasklist title to its ID using the cache."""
-        return self._title_id_cache[tasklist_title]
+        return list(self._title_id_cache[tasklist_title])

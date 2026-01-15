@@ -2,33 +2,41 @@
 
 import argparse
 import sys
+from functools import partial
 
-from gtasks.client.client_factory import build_cached_client
+from gtasks.cli.cli_utils import prompt_choose_tasklist_id
+from gtasks.client.api_client import ApiClient
+from gtasks.client.client_utils import resolve_tasklist_id
+from gtasks.utils.config import Config
 
 
-def cmd_add_task(args: argparse.Namespace) -> None:
+def cmd_add_task(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
     """Handle the 'add' command to create a new task."""
-    has_id = args.tasklist_id is not None
-    has_title = args.tasklist_title is not None
-    if has_id == has_title:
+    tasklist_title: None | str = args.tasklist_title or cfg.get_tasklist_title()
+    if tasklist_title is None:
         print(
-            "Error: You must specify exactly one of --tasklist-id (-t) or "
-            "--tasklist-title (-T)"
+            "Error: You must specify a --tasklist-title (-t) or set a default tasklist"
         )
         sys.exit(1)
 
-    client = build_cached_client()
-    tasklist_id = args.tasklist_id or client._resolve_tasklist_id(args.tasklist_title)
-    task = client.add_task(
-        tasklist_id=tasklist_id,
-        title=args.title,
-        notes=args.notes,
-        due=args.due,
-    )
-    print(f"Created task: {task.get('title', '<no title>')}")
+    tasklists: list = client.get_tasklists()
+    ids: list[str] = resolve_tasklist_id(args.tasklist_title, tasklists)
+
+    tasklist_id = prompt_choose_tasklist_id(ids, tasklists, args.tasklist_title)
+
+    if tasklist_id is not None:
+        task = client.add_task(
+            tasklist_id=tasklist_id,
+            title=args.title,
+            notes=args.notes,
+            due=args.due,
+        )
+        print(f"Created task: {task.get('title', '<no title>')}")
+    else:
+        print(f"Couldn't find a tasklist named {tasklist_title}")
 
 
-def add_add_task_subparser(subparsers) -> None:
+def add_subparser_add_task(subparsers, client: ApiClient, cfg: Config) -> None:
     """Add the 'add' subcommand to create a new task."""
     add_parser = subparsers.add_parser(
         "add",
@@ -42,14 +50,7 @@ def add_add_task_subparser(subparsers) -> None:
     )
     tasklist_group = add_parser.add_mutually_exclusive_group()
     tasklist_group.add_argument(
-        "-t",
-        "--tasklist-id",
-        type=str,
-        default=None,
-        help="ID of the task list to add the task to",
-    )
-    tasklist_group.add_argument(
-        "-T",
+        "-l",
         "--tasklist-title",
         type=str,
         default=None,
@@ -69,4 +70,4 @@ def add_add_task_subparser(subparsers) -> None:
         default=None,
         help="Due date for the task (RFC 3339 format)",
     )
-    add_parser.set_defaults(func=cmd_add_task)
+    add_parser.set_defaults(func=partial(cmd_add_task, client=client, cfg=cfg))

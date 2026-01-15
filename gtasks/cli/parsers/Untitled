@@ -3,7 +3,7 @@
 import argparse
 import sys
 
-from gtasks.client_factory import build_cached_client
+from gtasks.client_factory import build_client
 
 
 def cmd_add_task(args: argparse.Namespace) -> None:
@@ -13,11 +13,11 @@ def cmd_add_task(args: argparse.Namespace) -> None:
     if has_id == has_title:
         print(
             "Error: You must specify exactly one of --tasklist-id (-t) or "
-            "--tasklist-title (-T)"
+            "--tasklist-title (-l)"
         )
         sys.exit(1)
 
-    client = build_cached_client()
+    client = build_client()
     tasklist_id = args.tasklist_id or client._resolve_tasklist_id(args.tasklist_title)
     task = client.add_task(
         tasklist_id=tasklist_id,
@@ -49,7 +49,7 @@ def add_add_task_subparser(subparsers) -> None:
         help="ID of the task list to add the task to",
     )
     tasklist_group.add_argument(
-        "-T",
+        "-l",
         "--tasklist-title",
         type=str,
         default=None,

@@ -9,6 +9,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
+from gtasks.client.api_client import ApiClient
 from gtasks.client.cached_api_client import CachedApiClient
 from gtasks.defaults import APP_CFG_PATH, CACHE_FILE_PATH
 from gtasks.utils.bidict_cache import BidictCache
@@ -25,17 +26,20 @@ def build_tasks_resource(
     creds_path: Path = APP_CFG_PATH / "credentials.json",
 ) -> "TasksResource":
     """Build and return a Google Tasks API resource."""
-    creds: Credentials = _load_credentials(token_path, creds_path)
+    creds: Credentials = load_credentials(token_path, creds_path)
     return build("tasks", "v1", credentials=creds)
 
 
 def build_cached_client() -> CachedApiClient:
-    """Build and return a CachedApiClient instance with cache."""
     cache: BidictCache[str, str] = BidictCache(CACHE_FILE_PATH)
     return CachedApiClient(build_tasks_resource(), cache)
 
 
-def _load_credentials(
+def build_client() -> ApiClient:
+    return ApiClient(build_tasks_resource())
+
+
+def load_credentials(
     token_path: Path,
     creds_path: Path,
 ) -> Credentials:

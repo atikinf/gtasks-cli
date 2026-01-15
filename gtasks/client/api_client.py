@@ -1,8 +1,14 @@
+from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from googleapiclient._apis.tasks.v1.resources import TasksResource
     from googleapiclient._apis.tasks.v1.schemas import Task, TaskList
+
+
+class Status(Enum):
+    NEEDS_ACTION = "needsAction"
+    COMPLETED = "completed"
 
 
 class ApiClient:
