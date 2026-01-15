@@ -18,10 +18,13 @@ dependencies = [
     "google-api-python-client>=2.187",
     "bidict>=0.23.1",
     "pytest-mock>=3.15.1",
+    "google-api-python-client-stubs>=1.31.0",
+    "ty>=0.0.9",
+    "pytest-cov>=7.0.0",
 ]
 
 [project.scripts]
-gtasks = "gtasks.cli:main"
+gtasks = "gtasks.app:main"
 
 # uv looks in src/gtasks_cli/__init__.py by default
 [tool.uv.build-backend]
