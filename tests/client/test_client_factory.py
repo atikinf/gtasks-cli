@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
-from gtasks.client.client_factory import load_credentials
+from gtasks.client.client_factory import auth_from_file
 
 
 class TestLoadCredentials:
@@ -45,7 +45,7 @@ class TestLoadCredentials:
             patch.object(Path, "exists", return_value=True),
             patch.object(Path, "open", mock_open()),
         ):
-            result = load_credentials(token_path, creds_path)
+            result = auth_from_file(token_path, creds_path)
 
         assert result == valid_creds
         mock_pickle.dump.assert_not_called()  # Valid creds don't need re-saving
@@ -65,7 +65,7 @@ class TestLoadCredentials:
             patch.object(Path, "open", mock_open()),
             patch.object(Path, "mkdir"),
         ):
-            result = load_credentials(token_path, creds_path)
+            result = auth_from_file(token_path, creds_path)
 
         expired_creds_with_refresh_token.refresh.assert_called_once()
         mock_pickle.dump.assert_called_once()
@@ -90,7 +90,7 @@ class TestLoadCredentials:
             patch.object(Path, "open", mock_open()),
             patch.object(Path, "mkdir"),
         ):
-            result = load_credentials(token_path, creds_path)
+            result = auth_from_file(token_path, creds_path)
 
         mock_flow_class.from_client_secrets_file.assert_called_once_with(
             str(creds_path),
@@ -125,7 +125,7 @@ class TestLoadCredentials:
             patch.object(Path, "open", mock_open()),
             patch.object(Path, "mkdir"),
         ):
-            result = load_credentials(token_path, creds_path)
+            result = auth_from_file(token_path, creds_path)
 
         mock_flow.run_local_server.assert_called_once()
         assert result == new_creds
@@ -146,7 +146,7 @@ class TestLoadCredentials:
             patch.object(Path, "open", mock_open()),
             patch.object(Path, "mkdir") as mock_mkdir,
         ):
-            load_credentials(nested_token_path, creds_path)
+            auth_from_file(nested_token_path, creds_path)
 
         mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
@@ -165,7 +165,7 @@ class TestLoadCredentials:
             patch.object(Path, "open", mock_open()) as m_open,
             patch.object(Path, "mkdir"),
         ):
-            load_credentials(token_path, creds_path)
+            auth_from_file(token_path, creds_path)
 
         # Verify pickle.dump was called with the creds and the file handle
         mock_pickle.dump.assert_called_once()

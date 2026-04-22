@@ -27,3 +27,14 @@ def resolve_tasklist_id(tasklist_title: str, tasklists: list) -> list[str]:
         if tasklist_title == cur_title and cur_id is not None:
             matching_ids.append(cur_id)
     return matching_ids
+
+
+def resolve_task_id(task_title: str, tasks: list) -> list[str]:
+    """Case-insensitive task title to ID resolution."""
+    matching_ids: list[str] = []
+    for task in tasks:
+        cur_title = task.get("title", "")
+        cur_id = task.get("id")
+        if cur_title.lower() == task_title.lower() and cur_id is not None:
+            matching_ids.append(cur_id)
+    return matching_ids

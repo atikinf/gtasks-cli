@@ -45,6 +45,14 @@ class ApiClient:
         tasks_resource = self._service.tasks()
         return tasks_resource.insert(tasklist=tasklist_id, body=task_body).execute()
 
+    def complete_task(self, tasklist_id: str, task_id: str) -> "Task":
+        tasks_resource = self._service.tasks()
+        return tasks_resource.patch(
+            tasklist=tasklist_id,
+            task=task_id,
+            body={"status": Status.COMPLETED.value},
+        ).execute()
+
     def delete_task(self, tasklist_id: str, task_id: str) -> None:
         tasks_resource = self._service.tasks()
         tasks_resource.delete(tasklist=tasklist_id, task=task_id).execute()

@@ -1,4 +1,5 @@
 import argparse
+import re
 from collections.abc import Callable
 
 HINT = "Please choose a number between 1 and {num_options} or 'q' to cancel."
@@ -29,6 +30,69 @@ def print_tasklists(tasklists: list, args: argparse.Namespace) -> None:
             print(f"{ix}.   [{id_}] {title}")
         else:
             print(f"{ix}.   {title}")
+
+
+def prompt_setup_credentials(
+    input_fn: Callable[[str], str] = input,
+) -> None | tuple[str, str]:
+    client_id: None | str
+    client_secret: None | str
+    while True:
+        client_id = input_fn("Enter the client ID: ")
+        if client_id == "q":
+            return None
+        elif not validate_client_id(client_id):
+            print("Invalid input. Double check that you entered the correct client ID.")
+        else:
+            break
+    while True:
+        client_secret = input_fn("Enter the client secret: ")
+        if client_secret == "q":
+            return None
+        elif not validate_client_secret(client_secret):
+            print(
+                "Invalid input. Double check that you entered the correct client secret."
+            )
+        else:
+            break
+    return client_id, client_secret
+
+
+def validate_client_id(client_id: str) -> bool:
+    """
+    Expected format: {digits}-{alphanumeric}.apps.googleusercontent.com
+    """
+    pattern = r"^\d{5,20}-[a-z0-9]{20,50}\.apps\.googleusercontent\.com$"
+    return bool(re.match(pattern, client_id))
+
+
+def validate_client_secret(client_secret: str) -> bool:
+    """
+    Expected format: {alphanumeric with possible hyphens}
+    """
+    pattern = r"^[A-Za-z0-9_-]{20,50}$"
+    return bool(re.match(pattern, client_secret))
+
+
+def prompt_choose_task_id(
+    ids: list[str], tasks: list, task_title: str
+) -> None | str:
+    if len(ids) <= 0:
+        print(f"Error: No task found with title '{task_title}'!")
+    elif len(ids) == 1:
+        return ids[0]
+    else:
+        filtered_tasks = [t for t in tasks if t.get("id") in ids]
+        print_tasks(filtered_tasks, argparse.Namespace(show_ids=True))
+        ix_choice: None | int = prompt_index_choice(
+            len(filtered_tasks),
+            f"Found multiple tasks with title '{task_title}'.",
+            input,
+        )
+        if ix_choice is not None:
+            return filtered_tasks[ix_choice].get("id")
+
+    return None
 
 
 def prompt_choose_tasklist_id(

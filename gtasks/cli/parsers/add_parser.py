@@ -48,8 +48,7 @@ def add_subparser_add_task(subparsers, client: ApiClient, cfg: Config) -> None:
         type=str,
         help="Title of the task to create",
     )
-    tasklist_group = add_parser.add_mutually_exclusive_group()
-    tasklist_group.add_argument(
+    add_parser.add_argument(
         "-l",
         "--tasklist-title",
         type=str,
