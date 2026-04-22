@@ -368,13 +368,11 @@ class TestCmdListTasks:
         base_args["tasklist_title"] = "Work"
         args = argparse.Namespace(**base_args)
 
-        with patch(
-            "gtasks.cli.parsers.tasks_parser.prompt_choose_tasklist_id"
-        ) as mock_prompt:
+        with patch("gtasks.cli.parsers.tasks_parser.prompt_choose_tasklist_id") as mock_prompt:
             mock_prompt.return_value = "list1"
             cmd_list_tasks(args, mock_client, config)
 
-        mock_client.get_tasks.assert_called_once_with("list1", None)
+        mock_client.get_tasks.assert_called_once_with("list1", None, show_completed=False)
 
     def test_cmd_list_tasks_GIVEN_no_title_but_config_default_THEN_uses_config(
         self,

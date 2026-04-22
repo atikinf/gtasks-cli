@@ -130,7 +130,7 @@ class TestGetTasks:
         result = api_client.get_tasks(self.TASKLIST_ID)
 
         assert result == expected_tasks
-        service.tasks().list.assert_called_with(tasklist=self.TASKLIST_ID)
+        service.tasks().list.assert_called_with(tasklist=self.TASKLIST_ID, showCompleted=True)
 
     def test_get_tasks_GIVEN_empty_items_THEN_returns_empty_list(
         self, service: MagicMock, api_client: ApiClient
@@ -172,6 +172,39 @@ class TestGetTasks:
         assert result == self.PAGE1_ITEMS + self.PAGE2_ITEMS
         assert len(result) == 2
         assert service.tasks().list.call_count == 2  # page 3 not reached
+
+    def test_get_tasks_GIVEN_show_completed_false_THEN_passes_to_api(
+        self, service: MagicMock, api_client: ApiClient
+    ) -> None:
+        service.tasks().list().execute.return_value = {"items": []}
+
+        api_client.get_tasks(self.TASKLIST_ID, show_completed=False)
+
+        service.tasks().list.assert_called_with(
+            tasklist=self.TASKLIST_ID, showCompleted=False
+        )
+
+    def test_get_tasks_GIVEN_completed_min_THEN_passes_to_api(
+        self, service: MagicMock, api_client: ApiClient
+    ) -> None:
+        cutoff = "2026-04-22T00:00:00+00:00"
+        service.tasks().list().execute.return_value = {"items": []}
+
+        api_client.get_tasks(self.TASKLIST_ID, completed_min=cutoff)
+
+        service.tasks().list.assert_called_with(
+            tasklist=self.TASKLIST_ID, showCompleted=True, completedMin=cutoff
+        )
+
+    def test_get_tasks_GIVEN_no_completed_min_THEN_omits_from_api(
+        self, service: MagicMock, api_client: ApiClient
+    ) -> None:
+        service.tasks().list().execute.return_value = {"items": []}
+
+        api_client.get_tasks(self.TASKLIST_ID)
+
+        call_kwargs = service.tasks().list.call_args.kwargs
+        assert "completedMin" not in call_kwargs
 
 
 class TestAddTask:

@@ -22,12 +22,21 @@ class ApiClient:
 
         return self._pagination_loop({}, max_results, tasklists_resource)
 
-    def get_tasks(self, tasklist_id: str, max_results: int | None = None) -> list[Task]:
+    def get_tasks(
+        self,
+        tasklist_id: str,
+        max_results: int | None = None,
+        show_completed: bool = True,
+        completed_min: str | None = None,
+    ) -> list["Task"]:
         tasks_resource: TasksResource.TasksResource = self._service.tasks()
-
-        return self._pagination_loop(
-            {"tasklist": tasklist_id}, max_results, tasks_resource
-        )
+        kwargs_init: dict[str, Any] = {
+            "tasklist": tasklist_id,
+            "showCompleted": show_completed,
+        }
+        if completed_min is not None:
+            kwargs_init["completedMin"] = completed_min
+        return self._pagination_loop(kwargs_init, max_results, tasks_resource)
 
     def add_task(
         self,

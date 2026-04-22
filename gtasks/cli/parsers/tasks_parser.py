@@ -26,7 +26,10 @@ def cmd_list_tasks(args: argparse.Namespace, client: ApiClient, cfg: Config) -> 
 
     id_ = prompt_choose_tasklist_id(ids, tasklists, tasklist_title)
     if id_ is not None:
-        tasks = client.get_tasks(id_, args.limit)
+        # TODO: "show completed" mode — fetch needsAction tasks here, then read
+        # recently completed tasks from a local cache (populated by `gtasks done`)
+        # to append as strikethrough, avoiding a second API call. Configurable via `gtasks config`.
+        tasks = client.get_tasks(id_, args.limit, show_completed=False)
     else:
         print(f"Couldn't find a tasklist named {tasklist_title}")
 

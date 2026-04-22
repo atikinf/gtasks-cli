@@ -4,12 +4,23 @@ from collections.abc import Callable
 
 HINT = "Please choose a number between 1 and {num_options} or 'q' to cancel."
 
+_STRIKETHROUGH = "\033[9m"
+_RESET = "\033[0m"
+
+
+def _fmt_title(title: str, completed: bool) -> str:
+    if completed:
+        return f"{_STRIKETHROUGH}{title}{_RESET}"
+    return title
+
 
 def print_tasks(tasks: list, args: argparse.Namespace) -> None:
     for ix, task in enumerate(tasks, 1):
-        title: str = task.get("title", "<no title>")
+        raw_title: str = task.get("title", "<no title>")
         notes = task.get("notes")
         due = task.get("due")
+        completed = task.get("status") == "completed"
+        title = _fmt_title(raw_title, completed)
         if args.show_ids:
             id_ = task.get("id", "<no id>")
             print(f"{ix}.   [{id_}] {title}", end="")

@@ -1,9 +1,93 @@
+import argparse
 from unittest.mock import Mock, create_autospec
 
 import pytest
 from pytest import CaptureFixture
 
-from gtasks.cli.cli_utils import HINT, prompt_index_choice
+from gtasks.cli.cli_utils import HINT, _STRIKETHROUGH, print_tasks, prompt_index_choice
+
+
+class TestPrintTasks:
+    def test_print_tasks_GIVEN_completed_task_THEN_renders_strikethrough(
+        self, capsys: CaptureFixture[str]
+    ) -> None:
+        tasks = [{"id": "t1", "title": "Done task", "status": "completed"}]
+
+        print_tasks(tasks, argparse.Namespace(show_ids=False))
+
+        assert _STRIKETHROUGH in capsys.readouterr().out
+
+    def test_print_tasks_GIVEN_needs_action_task_THEN_no_strikethrough(
+        self, capsys: CaptureFixture[str]
+    ) -> None:
+        tasks = [{"id": "t1", "title": "Pending task", "status": "needsAction"}]
+
+        print_tasks(tasks, argparse.Namespace(show_ids=False))
+
+        output = capsys.readouterr().out
+        assert _STRIKETHROUGH not in output
+        assert "Pending task" in output
+
+    def test_print_tasks_GIVEN_no_status_field_THEN_no_strikethrough(
+        self, capsys: CaptureFixture[str]
+    ) -> None:
+        tasks = [{"id": "t1", "title": "Task"}]
+
+        print_tasks(tasks, argparse.Namespace(show_ids=False))
+
+        assert _STRIKETHROUGH not in capsys.readouterr().out
+
+    def test_print_tasks_GIVEN_show_ids_THEN_includes_id_in_output(
+        self, capsys: CaptureFixture[str]
+    ) -> None:
+        tasks = [{"id": "t1", "title": "Task"}]
+
+        print_tasks(tasks, argparse.Namespace(show_ids=True))
+
+        assert "[t1]" in capsys.readouterr().out
+
+    def test_print_tasks_GIVEN_completed_task_and_show_ids_THEN_strikethrough_and_id(
+        self, capsys: CaptureFixture[str]
+    ) -> None:
+        tasks = [{"id": "t1", "title": "Done", "status": "completed"}]
+
+        print_tasks(tasks, argparse.Namespace(show_ids=True))
+
+        output = capsys.readouterr().out
+        assert "[t1]" in output
+        assert _STRIKETHROUGH in output
+
+    def test_print_tasks_GIVEN_notes_THEN_prints_notes(
+        self, capsys: CaptureFixture[str]
+    ) -> None:
+        tasks = [{"id": "t1", "title": "Task", "notes": "Some notes"}]
+
+        print_tasks(tasks, argparse.Namespace(show_ids=False))
+
+        assert "Some notes" in capsys.readouterr().out
+
+    def test_print_tasks_GIVEN_due_date_THEN_prints_due(
+        self, capsys: CaptureFixture[str]
+    ) -> None:
+        tasks = [{"id": "t1", "title": "Task", "due": "2026-04-30"}]
+
+        print_tasks(tasks, argparse.Namespace(show_ids=False))
+
+        assert "2026-04-30" in capsys.readouterr().out
+
+    def test_print_tasks_GIVEN_multiple_tasks_THEN_all_printed(
+        self, capsys: CaptureFixture[str]
+    ) -> None:
+        tasks = [
+            {"id": "t1", "title": "First"},
+            {"id": "t2", "title": "Second"},
+        ]
+
+        print_tasks(tasks, argparse.Namespace(show_ids=False))
+
+        output = capsys.readouterr().out
+        assert "First" in output
+        assert "Second" in output
 
 
 @pytest.fixture
