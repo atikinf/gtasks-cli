@@ -34,6 +34,16 @@ class CachedApiClient(ApiClient):
         self._title_id_cache.save()
         return tasklists[:max_results] if max_results is not None else tasklists
 
+    def refresh_cache(self) -> list["TaskList"]:
+        """Force-clear and repopulate the tasklist cache from the API.
+
+        # TODO: add a configurable auto-refresh cutoff (e.g. invalidate cache
+        # entries older than N hours) so callers don't need to invoke this
+        # explicitly when the cache is stale.
+        """
+        self._title_id_cache.clear()
+        return self.get_tasklists()
+
     @override
     def resolve_tasklist_from_title(
         self,
