@@ -82,13 +82,7 @@ class TestAddParserArgs:
         self, parser: argparse.ArgumentParser
     ) -> None:
         with pytest.raises(SystemExit):
-            parser.parse_args(["add", "-t", "abc123"])
-
-    def test_add_GIVEN_both_tasklist_flags_THEN_exits(
-        self, parser: argparse.ArgumentParser
-    ) -> None:
-        with pytest.raises(SystemExit):
-            parser.parse_args(["add", "Task", "-t", "id1", "-l", "Work"])
+            parser.parse_args(["add"])
 
 
 class TestTasksParserArgs:
@@ -236,17 +230,25 @@ class TestCmdAddTask:
         base_args: dict,
         sample_tasklists: list[dict],
     ) -> None:
+        """Regression: config default title must be passed to resolve_tasklist_id,
+        not args.tasklist_title (which is None when -l is omitted)."""
         config.set_tasklist_title("Work")
         mock_client.get_tasklists.return_value = sample_tasklists
         mock_client.add_task.return_value = {"title": "Test Task"}
-        args = argparse.Namespace(**base_args)
+        args = argparse.Namespace(**base_args)  # tasklist_title=None
 
-        with patch(
-            "gtasks.cli.parsers.add_parser.prompt_choose_tasklist_id"
-        ) as mock_prompt:
+        with (
+            patch("gtasks.cli.parsers.add_parser.resolve_tasklist_id") as mock_resolve,
+            patch(
+                "gtasks.cli.parsers.add_parser.prompt_choose_tasklist_id"
+            ) as mock_prompt,
+        ):
+            mock_resolve.return_value = ["list1"]
             mock_prompt.return_value = "list1"
             cmd_add_task(args, mock_client, config)
 
+        mock_resolve.assert_called_once_with("Work", sample_tasklists)
+        mock_prompt.assert_called_once_with(["list1"], sample_tasklists, "Work")
         mock_client.add_task.assert_called_once()
 
     def test_cmd_add_task_GIVEN_no_tasklist_and_no_config_THEN_exits(

@@ -20,9 +20,9 @@ def cmd_add_task(args: argparse.Namespace, client: ApiClient, cfg: Config) -> No
         sys.exit(1)
 
     tasklists: list = client.get_tasklists()
-    ids: list[str] = resolve_tasklist_id(args.tasklist_title, tasklists)
+    ids: list[str] = resolve_tasklist_id(tasklist_title, tasklists)
 
-    tasklist_id = prompt_choose_tasklist_id(ids, tasklists, args.tasklist_title)
+    tasklist_id = prompt_choose_tasklist_id(ids, tasklists, tasklist_title)
 
     if tasklist_id is not None:
         task = client.add_task(
