@@ -7,7 +7,7 @@ from gtasks.cli.parsers.add_parser import add_subparser_add_task
 from gtasks.cli.parsers.delete_parser import add_subparser_delete
 from gtasks.cli.parsers.done_parser import add_subparser_done
 from gtasks.cli.parsers.lists_parser import add_subparser_lists
-from gtasks.cli.parsers.set_default_parser import add_subparser_use
+from gtasks.cli.parsers.use_parser import add_subparser_use
 from gtasks.cli.parsers.setup_parser import add_subparser_setup
 from gtasks.cli.parsers.tasks_parser import add_subparser_tasks, cmd_list_tasks
 from gtasks.client.api_client import ApiClient

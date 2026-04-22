@@ -22,6 +22,12 @@ class ApiClient:
 
         return self._pagination_loop({}, max_results, tasklists_resource)
 
+    def resolve_tasklist_from_title(self, tasklist_title: str) -> list["TaskList"]:
+        return [
+            tl for tl in self.get_tasklists()
+            if tl.get("title") == tasklist_title and tl.get("id") is not None
+        ]
+
     def get_tasks(
         self,
         tasklist_id: str,

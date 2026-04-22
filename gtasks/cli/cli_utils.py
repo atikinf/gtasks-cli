@@ -106,24 +106,21 @@ def prompt_choose_task_id(
     return None
 
 
-def prompt_choose_tasklist_id(
-    ids: list[str], tasklists: list, tasklist_title: str
-) -> None | str:
-    if len(ids) <= 0:
+def prompt_choose_tasklist_id(matches: list, tasklist_title: str) -> None | str:
+    ids = [tl.get("id") for tl in matches if tl.get("id") is not None]
+    if len(ids) == 0:
         print(f"Error: No tasklist found with title {tasklist_title}!")
     elif len(ids) == 1:
         return ids[0]
-    else:  # multiple resolved ids
-        filtered_tasklists = [li for li in tasklists if li.get("id") in ids]
-        print_tasklists(filtered_tasklists, argparse.Namespace(show_ids=True))
+    else:
+        print_tasklists(matches, argparse.Namespace(show_ids=True))
         ix_choice: None | int = prompt_index_choice(
-            len(filtered_tasklists),
+            len(matches),
             f"Found multiple tasklists with title {tasklist_title}.",
             input,
         )
-        if ix_choice:
-            id_: str | None = filtered_tasklists[ix_choice].get("id")
-            return id_
+        if ix_choice is not None:
+            return matches[ix_choice].get("id")
 
     return None
 

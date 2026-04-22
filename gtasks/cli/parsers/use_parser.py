@@ -6,15 +6,13 @@ from functools import partial
 from gtasks.cli import cli_utils
 from gtasks.cli.cli_utils import print_tasklists, prompt_choose_tasklist_id
 from gtasks.client.api_client import ApiClient
-from gtasks.client.client_utils import resolve_tasklist_id
 from gtasks.utils.config import Config
 
 
 def cmd_use(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
     """Handle the 'use' command to set the active task list."""
-    tasklists = client.get_tasklists()
-
     if args.name is None:
+        tasklists = client.get_tasklists()
         print_tasklists(tasklists, argparse.Namespace(show_ids=False))
         choice = cli_utils.prompt_index_choice(
             len(tasklists), "Select an active task list", input
@@ -23,8 +21,8 @@ def cmd_use(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
             return
         selected_title = tasklists[choice].get("title", "")
     else:
-        ids = resolve_tasklist_id(args.name, tasklists)
-        tasklist_id = prompt_choose_tasklist_id(ids, tasklists, args.name)
+        matches = client.resolve_tasklist_from_title(args.name)
+        tasklist_id = prompt_choose_tasklist_id(matches, args.name)
         if tasklist_id is None:
             return
         selected_title = args.name

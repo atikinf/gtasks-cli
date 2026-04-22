@@ -212,9 +212,7 @@ class TestCmdAddTask:
         mock_client: Mock,
         config: Config,
         base_args: dict,
-        sample_tasklists: list[dict],
     ) -> None:
-        mock_client.get_tasklists.return_value = sample_tasklists
         mock_client.add_task.return_value = {"title": "Test Task"}
         base_args["tasklist_title"] = "Work"
         args = argparse.Namespace(**base_args)
@@ -237,27 +235,20 @@ class TestCmdAddTask:
         mock_client: Mock,
         config: Config,
         base_args: dict,
-        sample_tasklists: list[dict],
     ) -> None:
-        """Regression: config default title must be passed to resolve_tasklist_id,
+        """Regression: config default title must be passed to resolve_tasklist_from_title,
         not args.tasklist_title (which is None when -l is omitted)."""
         config.set_tasklist_title("Work")
-        mock_client.get_tasklists.return_value = sample_tasklists
+        mock_client.resolve_tasklist_from_title.return_value = [{"id": "list1", "title": "Work"}]
         mock_client.add_task.return_value = {"title": "Test Task"}
         args = argparse.Namespace(**base_args)  # tasklist_title=None
 
-        with (
-            patch("gtasks.cli.parsers.add_parser.resolve_tasklist_id") as mock_resolve,
-            patch(
-                "gtasks.cli.parsers.add_parser.prompt_choose_tasklist_id"
-            ) as mock_prompt,
-        ):
-            mock_resolve.return_value = ["list1"]
+        with patch("gtasks.cli.parsers.add_parser.prompt_choose_tasklist_id") as mock_prompt:
             mock_prompt.return_value = "list1"
             cmd_add_task(args, mock_client, config)
 
-        mock_resolve.assert_called_once_with("Work", sample_tasklists)
-        mock_prompt.assert_called_once_with(["list1"], sample_tasklists, "Work")
+        mock_client.resolve_tasklist_from_title.assert_called_once_with("Work")
+        mock_prompt.assert_called_once_with([{"id": "list1", "title": "Work"}], "Work")
         mock_client.add_task.assert_called_once()
 
     def test_cmd_add_task_GIVEN_no_tasklist_and_no_config_THEN_exits(
@@ -281,9 +272,7 @@ class TestCmdAddTask:
         mock_client: Mock,
         config: Config,
         base_args: dict,
-        sample_tasklists: list[dict],
     ) -> None:
-        mock_client.get_tasklists.return_value = sample_tasklists
         mock_client.add_task.return_value = {"title": "Task"}
         base_args.update(
             tasklist_title="Work",
@@ -309,10 +298,8 @@ class TestCmdAddTask:
         mock_client: Mock,
         config: Config,
         base_args: dict,
-        sample_tasklists: list[dict],
         capsys: CaptureFixture[str],
     ) -> None:
-        mock_client.get_tasklists.return_value = sample_tasklists
         base_args["tasklist_title"] = "NonExistent"
         args = argparse.Namespace(**base_args)
 
@@ -361,9 +348,7 @@ class TestCmdListTasks:
         config: Config,
         base_args: dict,
         sample_tasks: list[dict],
-        sample_tasklists: list[dict],
     ) -> None:
-        mock_client.get_tasklists.return_value = sample_tasklists
         mock_client.get_tasks.return_value = sample_tasks
         base_args["tasklist_title"] = "Work"
         args = argparse.Namespace(**base_args)
@@ -380,10 +365,8 @@ class TestCmdListTasks:
         config: Config,
         base_args: dict,
         sample_tasks: list[dict],
-        sample_tasklists: list[dict],
     ) -> None:
         config.set_tasklist_title("Work")
-        mock_client.get_tasklists.return_value = sample_tasklists
         mock_client.get_tasks.return_value = sample_tasks
         args = argparse.Namespace(**base_args)
 
@@ -401,10 +384,8 @@ class TestCmdListTasks:
         config: Config,
         base_args: dict,
         sample_tasks: list[dict],
-        sample_tasklists: list[dict],
         capsys: CaptureFixture[str],
     ) -> None:
-        mock_client.get_tasklists.return_value = sample_tasklists
         mock_client.get_tasks.return_value = sample_tasks
         base_args["tasklist_title"] = "Work"
         base_args["show_ids"] = True
@@ -426,10 +407,8 @@ class TestCmdListTasks:
         config: Config,
         base_args: dict,
         sample_tasks: list[dict],
-        sample_tasklists: list[dict],
         capsys: CaptureFixture[str],
     ) -> None:
-        mock_client.get_tasklists.return_value = sample_tasklists
         mock_client.get_tasks.return_value = sample_tasks
         base_args["tasklist_title"] = "Work"
         args = argparse.Namespace(**base_args)
@@ -466,10 +445,8 @@ class TestCmdListTasks:
         mock_client: Mock,
         config: Config,
         base_args: dict,
-        sample_tasklists: list[dict],
         capsys: CaptureFixture[str],
     ) -> None:
-        mock_client.get_tasklists.return_value = sample_tasklists
         base_args["tasklist_title"] = "NonExistent"
         args = argparse.Namespace(**base_args)
 

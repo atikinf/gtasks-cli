@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import TYPE_CHECKING, override
 
 from gtasks.client.client_utils import tasklist_list_to_title_id_map
@@ -6,17 +5,11 @@ from gtasks.utils.bidict_cache import BidictCache
 
 from .api_client import ApiClient
 
-CONFIG_DIR: Path = Path("~/.config/gtasks-cli").expanduser()
-
-
-SCOPES: list[str] = ["https://www.googleapis.com/auth/tasks"]
-
 if TYPE_CHECKING:
     from googleapiclient._apis.tasks.v1.resources import TasksResource
     from googleapiclient._apis.tasks.v1.schemas import TaskList
 
 
-# TODO: Unused. Needs refining. When to refresh/invalidate cache?
 class CachedApiClient(ApiClient):
     def __init__(
         self,
@@ -31,16 +24,29 @@ class CachedApiClient(ApiClient):
         self,
         max_results: int | None = None,
     ) -> list["TaskList"]:
-        tasklists: list[TaskList] = super().get_tasklists(max_results)
+        if self._title_id_cache:
+            items = [{"title": t, "id": i} for t, i in self._title_id_cache.items()]
+            return items[:max_results] if max_results is not None else items
+
+        # Cache empty: fetch all from API and populate cache for future calls.
+        tasklists: list[TaskList] = super().get_tasklists(None)
         self._title_id_cache.clear_and_update(tasklist_list_to_title_id_map(tasklists))
         self._title_id_cache.save()
-
-        return tasklists
+        return tasklists[:max_results] if max_results is not None else tasklists
 
     @override
-    def resolve_tasklist_id(
+    def resolve_tasklist_from_title(
         self,
         tasklist_title: str,
-    ) -> list[str]:
-        """Resolve a tasklist title to its ID using the cache."""
-        return list(self._title_id_cache[tasklist_title])
+    ) -> list["TaskList"]:
+        """Resolve a tasklist title to a list of matching TaskList dicts using the cache.
+
+        Populates the cache via get_tasklists() if it is empty.
+        Returns a single-element list on a hit, or an empty list on a miss.
+        """
+        if not self._title_id_cache:
+            self.get_tasklists()
+        try:
+            return [{"title": tasklist_title, "id": self._title_id_cache[tasklist_title]}]
+        except KeyError:
+            return []

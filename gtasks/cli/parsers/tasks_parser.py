@@ -6,7 +6,6 @@ from functools import partial
 
 from gtasks.cli.cli_utils import print_tasks, prompt_choose_tasklist_id
 from gtasks.client.api_client import ApiClient
-from gtasks.client.client_utils import resolve_tasklist_id
 from gtasks.utils.config import Config
 
 
@@ -21,10 +20,9 @@ def cmd_list_tasks(args: argparse.Namespace, client: ApiClient, cfg: Config) -> 
         return
     tasks = []
 
-    tasklists: list = client.get_tasklists()
-    ids: list[str] = resolve_tasklist_id(tasklist_title, tasklists)
+    matches = client.resolve_tasklist_from_title(tasklist_title)
 
-    id_ = prompt_choose_tasklist_id(ids, tasklists, tasklist_title)
+    id_ = prompt_choose_tasklist_id(matches, tasklist_title)
     if id_ is not None:
         # TODO: "show completed" mode — fetch needsAction tasks here, then read
         # recently completed tasks from a local cache (populated by `gtasks done`)

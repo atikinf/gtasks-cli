@@ -4,13 +4,13 @@
 import sys
 
 from gtasks.cli.cli import build_parser
-from gtasks.client.client_factory import build_client
+from gtasks.client.client_factory import build_cached_client
 from gtasks.defaults import CONFIG_FILE_PATH
 from gtasks.utils.config import Config
 
 
 def main(argv: list[str] | None = None) -> int:
-    client = build_client()
+    client = build_cached_client()
 
     cfg_path = CONFIG_FILE_PATH
     cfg = Config(cfg_path)

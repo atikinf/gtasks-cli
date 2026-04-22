@@ -6,7 +6,7 @@ from functools import partial
 
 from gtasks.cli.cli_utils import prompt_choose_task_id, prompt_choose_tasklist_id
 from gtasks.client.api_client import ApiClient
-from gtasks.client.client_utils import resolve_task_id, resolve_tasklist_id
+from gtasks.client.client_utils import resolve_task_id
 from gtasks.utils.config import Config
 
 
@@ -17,9 +17,8 @@ def cmd_delete(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None
         print("Error: You must specify a --tasklist-title (-l) or set a default tasklist")
         sys.exit(1)
 
-    tasklists = client.get_tasklists()
-    tasklist_ids = resolve_tasklist_id(tasklist_title, tasklists)
-    tasklist_id = prompt_choose_tasklist_id(tasklist_ids, tasklists, tasklist_title)
+    matches = client.resolve_tasklist_from_title(tasklist_title)
+    tasklist_id = prompt_choose_tasklist_id(matches, tasklist_title)
     if tasklist_id is None:
         print(f"Couldn't find a tasklist named '{tasklist_title}'")
         return

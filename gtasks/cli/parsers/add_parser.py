@@ -6,7 +6,6 @@ from functools import partial
 
 from gtasks.cli.cli_utils import prompt_choose_tasklist_id
 from gtasks.client.api_client import ApiClient
-from gtasks.client.client_utils import resolve_tasklist_id
 from gtasks.utils.config import Config
 
 
@@ -19,10 +18,9 @@ def cmd_add_task(args: argparse.Namespace, client: ApiClient, cfg: Config) -> No
         )
         sys.exit(1)
 
-    tasklists: list = client.get_tasklists()
-    ids: list[str] = resolve_tasklist_id(tasklist_title, tasklists)
+    matches = client.resolve_tasklist_from_title(tasklist_title)
 
-    tasklist_id = prompt_choose_tasklist_id(ids, tasklists, tasklist_title)
+    tasklist_id = prompt_choose_tasklist_id(matches, tasklist_title)
 
     if tasklist_id is not None:
         task = client.add_task(
