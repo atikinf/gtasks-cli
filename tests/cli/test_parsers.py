@@ -160,16 +160,25 @@ class TestListsParserArgs:
         assert args.show_ids == expected_show_ids
 
 
-class TestSetDefaultParserArgs:
-    """Test argument parsing for the 'set-default' subcommand."""
+class TestUseParserArgs:
+    """Test argument parsing for the 'use' subcommand."""
 
-    def test_set_default_GIVEN_no_args_THEN_parses(
+    def test_use_GIVEN_no_args_THEN_parses(
         self, parser: argparse.ArgumentParser
     ) -> None:
-        args = parser.parse_args(["set-default"])
+        args = parser.parse_args(["use"])
 
-        assert args.command == "set-default"
+        assert args.command == "use"
+        assert args.name is None
         assert hasattr(args, "func")
+
+    def test_use_GIVEN_name_THEN_parses(
+        self, parser: argparse.ArgumentParser
+    ) -> None:
+        args = parser.parse_args(["use", "Work"])
+
+        assert args.command == "use"
+        assert args.name == "Work"
 
 
 # =============================================================================
