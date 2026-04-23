@@ -32,8 +32,23 @@ gtasks = "gtasks.app:main"
 module-root = ""
 module-name = "gtasks"
 
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "W",   # pycodestyle warnings
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["gtasks"]
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
+    "ruff>=0.15.11",
     "types-dateparser>=1.4.0.20260408",
 ]

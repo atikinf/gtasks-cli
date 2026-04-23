@@ -2,8 +2,6 @@
 
 import argparse
 import sys
-from functools import partial
-
 from gtasks.cli.cli_utils import prompt_setup_credentials
 from gtasks.client.client_factory import auth
 from gtasks.defaults import APP_CFG_PATH

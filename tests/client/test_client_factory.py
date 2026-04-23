@@ -162,7 +162,7 @@ class TestLoadCredentials:
 
         with (
             patch.object(Path, "exists", return_value=True),
-            patch.object(Path, "open", mock_open()) as m_open,
+            patch.object(Path, "open", mock_open()),
             patch.object(Path, "mkdir"),
         ):
             auth_from_file(token_path, creds_path)
