@@ -25,7 +25,13 @@ class ApiClient:
     def resolve_tasklist_from_title(self, tasklist_title: str) -> list["TaskList"]:
         return [
             tl for tl in self.get_tasklists()
-            if tl.get("title") == tasklist_title and tl.get("id") is not None
+            if tl.get("title", "").lower() == tasklist_title.lower() and tl.get("id") is not None
+        ]
+
+    def resolve_task_from_title(self, title: str, tasklist_id: str) -> list["Task"]:
+        return [
+            t for t in self.get_tasks(tasklist_id)
+            if t.get("title", "").lower() == title.lower() and t.get("id") is not None
         ]
 
     def get_tasks(
