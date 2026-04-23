@@ -4,9 +4,31 @@ import argparse
 import sys
 from functools import partial
 
+import dateparser
+
 from gtasks.cli.cli_utils import prompt_choose_tasklist_id
 from gtasks.client.api_client import ApiClient
 from gtasks.utils.config import Config
+
+
+def parse_due_date(date_str: str) -> str:
+    """Parse a human-readable date string and return an RFC 3339 timestamp.
+
+    Uses dateparser with PREFER_DATES_FROM=future so relative expressions like
+    "monday" or "next week" resolve to upcoming dates rather than past ones.
+    Always normalises to midnight UTC since the Tasks API ignores the time component.
+    """
+    dt = dateparser.parse(
+        date_str,
+        settings={
+            "PREFER_DATES_FROM": "future",
+            "RETURN_AS_TIMEZONE_AWARE": True,
+            "TO_TIMEZONE": "UTC",
+        },
+    )
+    if dt is None:
+        raise ValueError(f"Could not parse due date: {date_str!r}")
+    return dt.strftime("%Y-%m-%dT00:00:00.000Z")
 
 
 def cmd_add_task(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
@@ -27,7 +49,7 @@ def cmd_add_task(args: argparse.Namespace, client: ApiClient, cfg: Config) -> No
             tasklist_id=tasklist_id,
             title=args.title,
             notes=args.notes,
-            due=args.due,
+            due=parse_due_date(args.due) if args.due else None,
         )
         print(f"Created task: {task.get('title', '<no title>')}")
     else:
@@ -65,6 +87,6 @@ def add_subparser_add_task(subparsers, client: ApiClient, cfg: Config) -> None:
         "--due",
         type=str,
         default=None,
-        help="Due date for the task (RFC 3339 format)",
+        help="Due date for the task (natural language e.g. 'tomorrow', 'next friday', '2026-05-01')",
     )
     add_parser.set_defaults(func=partial(cmd_add_task, client=client, cfg=cfg))
