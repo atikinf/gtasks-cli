@@ -1,11 +1,27 @@
 import argparse
 import re
 from collections.abc import Callable
+from datetime import datetime, timezone
 
 HINT = "Please choose a number between 1 and {num_options} or 'q' to cancel."
 
 _STRIKETHROUGH = "\033[9m"
 _RESET = "\033[0m"
+
+
+def _ordinal(n: int) -> str:
+    if 11 <= (n % 100) <= 13:
+        return f"{n}th"
+    return f"{n}{['th', 'st', 'nd', 'rd', 'th'][min(n % 10, 4)]}"
+
+
+def _fmt_due(due: str) -> str:
+    """Format an RFC 3339 due date string as e.g. 'Tuesday, April 22nd'."""
+    try:
+        dt = datetime.fromisoformat(due.replace("Z", "+00:00")).astimezone(timezone.utc)
+        return dt.strftime("%A, %B ") + _ordinal(dt.day)
+    except ValueError:
+        return due
 
 
 def _fmt_title(title: str, completed: bool) -> str:
@@ -27,7 +43,7 @@ def print_tasks(tasks: list, args: argparse.Namespace) -> None:
         else:
             print(f"{ix}.   {title}", end="")
         if due:
-            print(f"        (Due: {due})", end="")
+            print(f"        (Due: {_fmt_due(due)})", end="")
         print()
         if notes:
             print(f"        Notes: {notes}")
