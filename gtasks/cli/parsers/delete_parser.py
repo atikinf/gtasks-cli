@@ -6,7 +6,6 @@ from functools import partial
 
 from gtasks.cli.cli_utils import prompt_choose_task_id, prompt_choose_tasklist_id
 from gtasks.client.api_client import ApiClient
-from gtasks.client.client_utils import resolve_task_id
 from gtasks.utils.config import Config
 
 
@@ -23,9 +22,9 @@ def cmd_delete(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None
         print(f"Couldn't find a tasklist named '{tasklist_title}'")
         return
 
-    tasks = client.get_tasks(tasklist_id)
-    task_ids = resolve_task_id(args.title, tasks)
-    task_id = prompt_choose_task_id(task_ids, tasks, args.title)
+    matches = client.resolve_task_from_title(args.title, tasklist_id)
+    task_ids = [t["id"] for t in matches if t.get("id")]
+    task_id = prompt_choose_task_id(task_ids, matches, args.title)
     if task_id is None:
         return
 
