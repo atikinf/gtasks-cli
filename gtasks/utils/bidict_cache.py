@@ -17,14 +17,11 @@ class BidictCache[K, V](bidict[K, V]):
             self._cache_path: Path = cache_path.expanduser()
             self.load()
 
-    def clear_and_update(self, items: dict[K, V]) -> None:
+    def overwrite(self, items: dict[K, V]) -> None:
+        """Replace in-memory state and persist to disk."""
         self.clear()
         self.update(items)
-
-    def save(self) -> None:
-        self._cache_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._cache_path.open(mode="w", encoding="utf-8") as f:
-            json.dump(obj=dict(self), fp=f, indent=2, ensure_ascii=False)
+        self._save()
 
     def load(self):
         if not self._cache_path.exists():
@@ -38,3 +35,8 @@ class BidictCache[K, V](bidict[K, V]):
             raise ValueError(self.ERR_PARSE_JSON) from e
         except DuplicationError as e:
             raise ValueError(self.ERR_DUPLICATE_KEY_VALUE) from e
+
+    def _save(self) -> None:
+        self._cache_path.parent.mkdir(parents=True, exist_ok=True)
+        with self._cache_path.open(mode="w", encoding="utf-8") as f:
+            json.dump(obj=dict(self), fp=f, indent=2, ensure_ascii=False)

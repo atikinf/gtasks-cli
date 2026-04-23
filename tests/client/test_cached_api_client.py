@@ -46,7 +46,7 @@ class TestCachedGetTasklists:
     ) -> None:
         service.tasklists().list().execute.return_value = {"items": self.SAMPLE_TASKLISTS}
 
-        with patch.object(empty_cache, "save"):
+        with patch.object(empty_cache, "_save"):
             result = client_empty_cache.get_tasklists()
 
         service.tasklists().list.assert_called()
@@ -76,7 +76,7 @@ class TestCachedGetTasklists:
     ) -> None:
         service.tasklists().list().execute.return_value = {"items": self.SAMPLE_TASKLISTS}
 
-        with patch.object(empty_cache, "save"):
+        with patch.object(empty_cache, "_save"):
             result = client_empty_cache.get_tasklists(max_results=1)
 
         # Fetched with max_results=None to fully populate the cache
@@ -106,7 +106,7 @@ class TestCachedResolveTasklistId:
             "items": [{"id": "list1", "title": "Work"}]
         }
 
-        with patch.object(empty_cache, "save"):
+        with patch.object(empty_cache, "_save"):
             result = client_empty_cache.resolve_tasklist_from_title("Work")
 
         assert result == [{"title": "Work", "id": "list1"}]

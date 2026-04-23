@@ -30,8 +30,7 @@ class CachedApiClient(ApiClient):
 
         # Cache empty: fetch all from API and populate cache for future calls.
         tasklists: list[TaskList] = super().get_tasklists(None)
-        self._title_id_cache.clear_and_update(tasklist_list_to_title_id_map(tasklists))
-        self._title_id_cache.save()
+        self._title_id_cache.overwrite(tasklist_list_to_title_id_map(tasklists))
         return tasklists[:max_results] if max_results is not None else tasklists
 
     def refresh_cache(self) -> list["TaskList"]:

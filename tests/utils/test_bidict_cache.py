@@ -12,13 +12,12 @@ class TestInitBidictCache:
         assert len(bdc) == 0
 
 
-class TestSaveBidictCache:
-    def test_save_GIVEN_valid_path_THEN_success(self, tmp_path: Path):
+class TestOverwriteBidictCache:
+    def test_overwrite_GIVEN_valid_path_THEN_persists(self, tmp_path: Path):
         cache_path: Path = tmp_path / "subdir" / "test_cache.json"
         bdc: BidictCache[str, str] = BidictCache(cache_path)
 
-        bdc.update({"key1": "value1", "key2": "value2"})
-        bdc.save()
+        bdc.overwrite({"key1": "value1", "key2": "value2"})
 
         assert cache_path.exists()
         with cache_path.open("r", encoding="utf-8") as f:
@@ -26,7 +25,7 @@ class TestSaveBidictCache:
         assert '"key1": "value1"' in saved_data
         assert '"key2": "value2"' in saved_data
 
-    def test_clear_update_save_GIVEN_existing_path_THEN_overwrite(self, tmp_path: Path):
+    def test_overwrite_GIVEN_existing_path_THEN_replaces(self, tmp_path: Path):
         cache_path: Path = tmp_path / "subdir" / "test_cache.json"
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         cache_path.write_text('{"key1": "value1", "key2": "value2"}', encoding="utf-8")
@@ -36,11 +35,8 @@ class TestSaveBidictCache:
         assert '"key2": "value2"' in saved_data
 
         bdc: BidictCache[str, str] = BidictCache(cache_path)
-        bdc.clear_and_update({"key3": "value3", "key4": "value4"})
+        bdc.overwrite({"key3": "value3", "key4": "value4"})
 
-        bdc.save()
-
-        assert cache_path.exists()
         with cache_path.open("r", encoding="utf-8") as f:
             saved_data = f.read()
         assert '"key3": "value3"' in saved_data
@@ -86,8 +82,7 @@ class TestClearBidictCache:
     def test_clear_GIVEN_populated_cache_THEN_empties(self, tmp_path: Path):
         cache_path: Path = tmp_path / "subdir" / "test_cache.json"
         bdc: BidictCache[str, str] = BidictCache(cache_path)
-        bdc.update({"key1": "value1", "key2": "value2"})
-        bdc.save()
+        bdc.overwrite({"key1": "value1", "key2": "value2"})
         assert len(bdc) == 2
 
         bdc.clear()
