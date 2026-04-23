@@ -33,7 +33,9 @@ def build_tasks_resource(
 def build_cached_client() -> CachedApiClient:
     tasklists_cache: BidictCache[str, str] = BidictCache(CACHE_FILE_PATH)
     tasks_cache: dict[str, BidictCache[str, str]] = {}
-    return CachedApiClient(build_tasks_resource(), tasklists_cache, TASKS_CACHE_DIR_PATH, tasks_cache)
+    return CachedApiClient(
+        build_tasks_resource(), tasklists_cache, TASKS_CACHE_DIR_PATH, tasks_cache
+    )
 
 
 def build_client() -> ApiClient:

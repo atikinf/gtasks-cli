@@ -8,9 +8,9 @@ from gtasks.cli.parsers.delete_parser import add_subparser_delete
 from gtasks.cli.parsers.done_parser import add_subparser_done
 from gtasks.cli.parsers.lists_parser import add_subparser_lists
 from gtasks.cli.parsers.refresh_parser import add_subparser_refresh
-from gtasks.cli.parsers.use_parser import add_subparser_use
 from gtasks.cli.parsers.setup_parser import add_subparser_setup
 from gtasks.cli.parsers.tasks_parser import add_subparser_tasks, cmd_list_tasks
+from gtasks.cli.parsers.use_parser import add_subparser_use
 from gtasks.client.api_client import ApiClient
 from gtasks.utils.config import Config
 
@@ -56,16 +56,17 @@ def build_parser(client: ApiClient, cfg: Config) -> argparse.ArgumentParser:
 > gtasks <anything>
 Do you have an API credentials file in `~/.config/gtasks`? See <insert_doc_link>
 > gtasks <anything>
-This is your first time using `gtasks`. Run `gtasks auth` to open a browser tab to authenticate your Google account.
-> gtasks config 
+This is your first time using `gtasks`. Run `gtasks auth` to open a browser tab
+to authenticate your Google account.
+> gtasks config
 <print flags, etc.>
-> gtasks tasks 
+> gtasks tasks
 ==[To Do]==
-1.  Hello 
-    ∟ Say hello      
-2.  Test 
+1.  Hello
+    ∟ Say hello
+2.  Test
 3.  Yes
-> gtasks add task "Yes" "Descr" [parsed as Title: "Yes", Description: "Descr", optional flags for other params]
+> gtasks add task "Yes" "Descr" [parsed as Title: "Yes", Description: "Descr", optional flags]
 Added task:
     Yes
     ∟ Descr
@@ -75,7 +76,7 @@ Added list:
 > gtasks delete task "Hello"
 Deleted task:
     Hello
-    ∟ Say hello   
+    ∟ Say hello
 
 TODO
 

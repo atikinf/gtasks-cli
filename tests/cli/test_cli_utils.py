@@ -4,7 +4,7 @@ from unittest.mock import Mock, create_autospec
 import pytest
 from pytest import CaptureFixture
 
-from gtasks.cli.cli_utils import HINT, _STRIKETHROUGH, print_tasks, prompt_index_choice
+from gtasks.cli.cli_utils import _STRIKETHROUGH, HINT, print_tasks, prompt_index_choice
 
 
 class TestPrintTasks:

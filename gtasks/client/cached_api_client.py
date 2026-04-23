@@ -84,7 +84,10 @@ class CachedApiClient(ApiClient):
             if not title or not id_:
                 continue
             if title in deduped:
-                print(f"Warning: duplicate {label} title '{title}' — skipping duplicate in cache", file=sys.stderr)
+                print(
+                    f"Warning: duplicate {label} title '{title}' — skipping duplicate in cache",
+                    file=sys.stderr,
+                )
                 continue
             deduped[title] = id_
         return deduped

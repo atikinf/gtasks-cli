@@ -33,7 +33,7 @@ module-root = ""
 module-name = "gtasks"
 
 [tool.ruff]
-line-length = 88
+line-length = 100
 
 [tool.ruff.lint]
 select = [

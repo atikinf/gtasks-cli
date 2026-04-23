@@ -87,6 +87,6 @@ def add_subparser_add_task(subparsers, client: ApiClient, cfg: Config) -> None:
         "--due",
         type=str,
         default=None,
-        help="Due date for the task (natural language e.g. 'tomorrow', 'next friday', '2026-05-01')",
+        help="Due date (natural language e.g. 'tomorrow', 'next friday', '2026-05-01')",
     )
     add_parser.set_defaults(func=partial(cmd_add_task, client=client, cfg=cfg))
