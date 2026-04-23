@@ -69,11 +69,11 @@ class TestPrintTasks:
     def test_print_tasks_GIVEN_due_date_THEN_prints_due(
         self, capsys: CaptureFixture[str]
     ) -> None:
-        tasks = [{"id": "t1", "title": "Task", "due": "2026-04-30"}]
+        tasks = [{"id": "t1", "title": "Task", "due": "2026-04-30T00:00:00.000Z"}]
 
         print_tasks(tasks, argparse.Namespace(show_ids=False))
 
-        assert "2026-04-30" in capsys.readouterr().out
+        assert "Thursday, April 30th" in capsys.readouterr().out
 
     def test_print_tasks_GIVEN_multiple_tasks_THEN_all_printed(
         self, capsys: CaptureFixture[str]

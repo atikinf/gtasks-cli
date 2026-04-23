@@ -290,7 +290,7 @@ class TestCmdAddTask:
             tasklist_id="list1",
             title="Test Task",
             notes="Important notes",
-            due="2026-01-20T00:00:00Z",
+            due="2026-01-20T00:00:00.000Z",
         )
 
     def test_cmd_add_task_GIVEN_no_matching_tasklist_THEN_prints_error(
@@ -330,7 +330,7 @@ class TestCmdListTasks:
         """Sample task data for testing."""
         return [
             {"id": "t1", "title": "Task 1", "notes": "Notes 1"},
-            {"id": "t2", "title": "Task 2", "due": "2026-01-20"},
+            {"id": "t2", "title": "Task 2", "due": "2026-01-20T00:00:00.000Z"},
             {"id": "t3", "title": "Task 3"},
         ]
 
@@ -422,7 +422,7 @@ class TestCmdListTasks:
         output = capsys.readouterr().out
         assert "Task 1" in output
         assert "Notes: Notes 1" in output
-        assert "Due: 2026-01-20" in output
+        assert "January 20th" in output
 
     def test_cmd_list_tasks_GIVEN_no_tasklist_and_no_config_THEN_exits(
         self,
