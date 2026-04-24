@@ -6,7 +6,7 @@ from functools import partial
 from gtasks.cli import cli_utils
 from gtasks.cli.cli_utils import print_tasklists, prompt_choose_tasklist_id
 from gtasks.client.api_client import ApiClient
-from gtasks.utils.config import Config
+from gtasks.utils.config import Config, ConfigKey
 
 
 def cmd_use(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
@@ -27,7 +27,7 @@ def cmd_use(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
             return
         selected_title = args.name
 
-    cfg.set_tasklist_title(selected_title)
+    cfg.set(ConfigKey.DEFAULT_TASKLIST_TITLE, selected_title)
     print(f"Active task list set to: {selected_title}")
 
 

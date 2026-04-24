@@ -8,7 +8,7 @@ import dateparser
 
 from gtasks.cli.cli_utils import prompt_choose_tasklist_id
 from gtasks.client.api_client import ApiClient
-from gtasks.utils.config import Config
+from gtasks.utils.config import Config, ConfigKey
 
 
 def parse_due_date(date_str: str) -> str:
@@ -33,7 +33,7 @@ def parse_due_date(date_str: str) -> str:
 
 def cmd_add_task(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
     """Handle the 'add' command to create a new task."""
-    tasklist_title: None | str = args.tasklist_title or cfg.get_tasklist_title()
+    tasklist_title: None | str = args.tasklist_title or cfg.get(ConfigKey.DEFAULT_TASKLIST_TITLE)
     if tasklist_title is None:
         print(
             "Error: You must specify a --tasklist-title (-t) or set a default tasklist"

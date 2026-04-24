@@ -12,7 +12,7 @@ from gtasks.cli.cli import build_parser
 from gtasks.cli.parsers.add_parser import cmd_add_task
 from gtasks.cli.parsers.lists_parser import cmd_list_tasklists
 from gtasks.cli.parsers.tasks_parser import cmd_list_tasks
-from gtasks.utils.config import Config
+from gtasks.utils.config import Config, ConfigKey
 
 # =============================================================================
 # Shared Fixtures
@@ -238,7 +238,7 @@ class TestCmdAddTask:
     ) -> None:
         """Regression: config default title must be passed to resolve_tasklist_from_title,
         not args.tasklist_title (which is None when -l is omitted)."""
-        config.set_tasklist_title("Work")
+        config.set(ConfigKey.DEFAULT_TASKLIST_TITLE, "Work")
         mock_client.resolve_tasklist_from_title.return_value = [{"id": "list1", "title": "Work"}]
         mock_client.add_task.return_value = {"title": "Test Task"}
         args = argparse.Namespace(**base_args)  # tasklist_title=None
@@ -366,7 +366,7 @@ class TestCmdListTasks:
         base_args: dict,
         sample_tasks: list[dict],
     ) -> None:
-        config.set_tasklist_title("Work")
+        config.set(ConfigKey.DEFAULT_TASKLIST_TITLE, "Work")
         mock_client.get_tasks.return_value = sample_tasks
         args = argparse.Namespace(**base_args)
 

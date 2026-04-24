@@ -1,14 +1,16 @@
 from configparser import ConfigParser
+from enum import Enum
 from pathlib import Path
 
 DEFAULT_SECTION: str = "DEFAULT"
-DEFAULT_TASKLIST_TITLE: str = "default_tasklist_title"
+
+
+class ConfigKey(Enum):
+    DEFAULT_TASKLIST_TITLE = "default_tasklist"
 
 
 class Config:
-    """
-    Simple config file manager
-    """
+    """Simple config file manager."""
 
     def __init__(
         self,
@@ -21,21 +23,19 @@ class Config:
         if self._config_path.exists():
             self._parser.read(self._config_path)
 
-    def set_tasklist_title(
-        self, tasklist_title: str, section: str = DEFAULT_SECTION
-    ) -> None:
-        if section not in self._parser:
-            self._parser[section] = {}
-
-        self._parser[section][DEFAULT_TASKLIST_TITLE] = tasklist_title
-
-        self._save()
-
-    def get_tasklist_title(self, section: str = DEFAULT_SECTION) -> str | None:
+    def get(self, key: ConfigKey, section: str = DEFAULT_SECTION) -> str | None:
         if section not in self._parser:
             return None
+        return self._parser[section].get(key.value)
 
-        return self._parser[section].get(DEFAULT_TASKLIST_TITLE)
+    def set(self, key: ConfigKey, value: str, section: str = DEFAULT_SECTION) -> None:
+        if section not in self._parser:
+            self._parser[section] = {}
+        self._parser[section][key.value] = value
+        self._save()
+
+    def get_all(self, section: str = DEFAULT_SECTION) -> dict[ConfigKey, str | None]:
+        return {key: self.get(key, section) for key in ConfigKey}
 
     def _save(self) -> None:
         """Write current config to disk."""

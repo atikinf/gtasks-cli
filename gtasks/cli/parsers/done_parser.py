@@ -6,12 +6,12 @@ from functools import partial
 
 from gtasks.cli.cli_utils import prompt_choose_task_id, prompt_choose_tasklist_id
 from gtasks.client.api_client import ApiClient
-from gtasks.utils.config import Config
+from gtasks.utils.config import Config, ConfigKey
 
 
 def cmd_done(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
     """Handle the 'done' command to mark a task complete."""
-    tasklist_title: None | str = args.tasklist_title or cfg.get_tasklist_title()
+    tasklist_title: None | str = args.tasklist_title or cfg.get(ConfigKey.DEFAULT_TASKLIST_TITLE)
     if tasklist_title is None:
         print("Error: You must specify a --tasklist-title (-l) or set a default tasklist")
         sys.exit(1)
