@@ -1,4 +1,4 @@
-"""Setup subcommand - configure OAuth credentials."""
+"""Auth subcommand - configure OAuth credentials."""
 
 import argparse
 import sys
@@ -22,8 +22,8 @@ Enter 'q' at any prompt to cancel.
 """
 
 
-def cmd_setup(args: argparse.Namespace) -> None:
-    """Handle the 'setup' command to configure OAuth credentials."""
+def cmd_auth(args: argparse.Namespace) -> None:
+    """Handle the 'auth' command to configure OAuth credentials."""
     print(_SETUP_INSTRUCTIONS)
     result = prompt_setup_credentials()
     if result is None:
@@ -35,11 +35,11 @@ def cmd_setup(args: argparse.Namespace) -> None:
     print("Authentication successful. You're ready to use gtasks.")
 
 
-def add_subparser_setup(subparsers) -> None:
-    """Add the 'setup' subcommand to configure OAuth credentials."""
-    setup_parser = subparsers.add_parser(
-        "setup",
+def add_subparser_auth(subparsers) -> None:
+    """Add the 'auth' subcommand to configure OAuth credentials."""
+    auth_parser = subparsers.add_parser(
+        "auth",
         help="Configure Google OAuth credentials",
         description="Interactively enter your Google OAuth client ID and secret to authenticate.",
     )
-    setup_parser.set_defaults(func=cmd_setup)
+    auth_parser.set_defaults(func=cmd_auth)
