@@ -10,6 +10,7 @@ from pytest import CaptureFixture
 
 from gtasks.cli.cli import build_parser
 from gtasks.cli.parsers.add_parser import cmd_add_task
+from gtasks.cli.parsers.config_parser import cmd_config
 from gtasks.cli.parsers.lists_parser import cmd_list_tasklists
 from gtasks.cli.parsers.tasks_parser import cmd_list_tasks
 from gtasks.utils.config import Config, ConfigKey
@@ -179,6 +180,35 @@ class TestUseParserArgs:
 
         assert args.command == "use"
         assert args.name == "Work"
+
+
+class TestConfigParserArgs:
+    """Test argument parsing for the 'config' subcommand."""
+
+    def test_config_GIVEN_no_args_THEN_key_and_value_are_none(
+        self, parser: argparse.ArgumentParser
+    ) -> None:
+        args = parser.parse_args(["config"])
+
+        assert args.command == "config"
+        assert args.key is None
+        assert args.value is None
+
+    def test_config_GIVEN_key_only_THEN_value_is_none(
+        self, parser: argparse.ArgumentParser
+    ) -> None:
+        args = parser.parse_args(["config", "default_tasklist"])
+
+        assert args.key == "default_tasklist"
+        assert args.value is None
+
+    def test_config_GIVEN_key_and_value_THEN_both_parsed(
+        self, parser: argparse.ArgumentParser
+    ) -> None:
+        args = parser.parse_args(["config", "default_tasklist", "Work"])
+
+        assert args.key == "default_tasklist"
+        assert args.value == "Work"
 
 
 # =============================================================================
@@ -523,3 +553,67 @@ class TestCmdListTasklists:
         output = capsys.readouterr().out
         assert "[list1]" in output
         assert "[list2]" in output
+
+
+class TestCmdConfig:
+    """Test the cmd_config command handler."""
+
+    def test_cmd_config_GIVEN_no_args_THEN_prints_all_settings(
+        self, config: Config, capsys: CaptureFixture[str]
+    ) -> None:
+        config.set(ConfigKey.DEFAULT_TASKLIST_TITLE, "Work")
+        args = argparse.Namespace(key=None, value=None)
+
+        cmd_config(args, config)
+
+        output = capsys.readouterr().out
+        assert "default_tasklist = Work" in output
+
+    def test_cmd_config_GIVEN_no_args_and_unset_THEN_prints_not_set(
+        self, config: Config, capsys: CaptureFixture[str]
+    ) -> None:
+        args = argparse.Namespace(key=None, value=None)
+
+        cmd_config(args, config)
+
+        assert "(not set)" in capsys.readouterr().out
+
+    def test_cmd_config_GIVEN_key_only_THEN_prints_value(
+        self, config: Config, capsys: CaptureFixture[str]
+    ) -> None:
+        config.set(ConfigKey.DEFAULT_TASKLIST_TITLE, "Personal")
+        args = argparse.Namespace(key="default_tasklist", value=None)
+
+        cmd_config(args, config)
+
+        assert "default_tasklist = Personal" in capsys.readouterr().out
+
+    def test_cmd_config_GIVEN_key_only_and_unset_THEN_prints_not_set(
+        self, config: Config, capsys: CaptureFixture[str]
+    ) -> None:
+        args = argparse.Namespace(key="default_tasklist", value=None)
+
+        cmd_config(args, config)
+
+        assert "(not set)" in capsys.readouterr().out
+
+    def test_cmd_config_GIVEN_key_and_value_THEN_sets_and_prints(
+        self, config: Config, capsys: CaptureFixture[str]
+    ) -> None:
+        args = argparse.Namespace(key="default_tasklist", value="Work")
+
+        cmd_config(args, config)
+
+        assert config.get(ConfigKey.DEFAULT_TASKLIST_TITLE) == "Work"
+        assert "default_tasklist = Work" in capsys.readouterr().out
+
+    def test_cmd_config_GIVEN_invalid_key_THEN_exits(
+        self, config: Config, capsys: CaptureFixture[str]
+    ) -> None:
+        args = argparse.Namespace(key="nonexistent", value=None)
+
+        with pytest.raises(SystemExit) as exc:
+            cmd_config(args, config)
+
+        assert exc.value.code == 1
+        assert "Unknown key" in capsys.readouterr().out

@@ -17,7 +17,7 @@ Since you need to authenticate with your own API credentials, run `uv run gtasks
 * Verify `gtasks auth` end-to-end functionality.
 * "Show completed" mode — fetch needsAction tasks, then read recently-completed tasks from a local cache (populated by `gtasks done`) to append as strikethrough. Avoids a second API call. Configurable via `gtasks config`.
 * Extend the task cache to include full task metadata (due dates, notes, status) so display commands don't need to hit the API.
-* `gtasks config` — interactive command for managing defaults (active list, show-completed mode, etc.).
+* Add undo functionality, store recent history on disk for undo purposes.
 
 *Stretch Goals*:
 * Tab-autocomplete leveraging the tasklists cache
