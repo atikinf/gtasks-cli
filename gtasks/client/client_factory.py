@@ -13,6 +13,7 @@ from gtasks.client.api_client import ApiClient
 from gtasks.client.cached_api_client import CachedApiClient
 from gtasks.defaults import APP_CFG_PATH, CACHE_FILE_PATH, TASKS_CACHE_DIR_PATH
 from gtasks.utils.bidict_cache import BidictCache
+from gtasks.utils.tasks_cache import TasksCache
 
 if TYPE_CHECKING:
     from googleapiclient._apis.tasks.v1.resources import TasksResource
@@ -32,10 +33,8 @@ def build_tasks_resource(
 
 def build_cached_client() -> CachedApiClient:
     tasklists_cache: BidictCache[str, str] = BidictCache(CACHE_FILE_PATH)
-    tasks_cache: dict[str, BidictCache[str, str]] = {}
-    return CachedApiClient(
-        build_tasks_resource(), tasklists_cache, TASKS_CACHE_DIR_PATH, tasks_cache
-    )
+    tasks_cache = TasksCache(TASKS_CACHE_DIR_PATH)
+    return CachedApiClient(build_tasks_resource(), tasklists_cache, tasks_cache)
 
 
 def build_client() -> ApiClient:

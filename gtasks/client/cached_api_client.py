@@ -1,8 +1,8 @@
 import sys
-from pathlib import Path
 from typing import TYPE_CHECKING, override
 
 from gtasks.utils.bidict_cache import BidictCache
+from gtasks.utils.tasks_cache import TasksCache
 
 from .api_client import ApiClient
 
@@ -16,13 +16,11 @@ class CachedApiClient(ApiClient):
         self,
         service: "TasksResource",
         title_id_cache: BidictCache[str, str],  # title <-> id tasklists
-        tasks_cache_dir: Path,
-        tasks_cache: dict[str, BidictCache[str, str]],
+        tasks_cache: TasksCache,
     ) -> None:
         super().__init__(service)
         self._title_id_cache: BidictCache[str, str] = title_id_cache
-        self._tasks_cache_dir: Path = tasks_cache_dir
-        self._tasks_cache: dict[str, BidictCache[str, str]] = tasks_cache
+        self._tasks_cache: TasksCache = tasks_cache
 
     @override
     def get_tasklists(
@@ -46,27 +44,41 @@ class CachedApiClient(ApiClient):
         show_completed: bool = True,
         completed_min: str | None = None,
     ) -> list["Task"]:
-        # TODO: Write dedicated tasks cache that includes task metadata.
-        # Cache only stores title->id; callers expecting full task objects
-        # (due dates, notes, status) would get stripped results. Bypass until fixed.
-        return super().get_tasks(tasklist_id, max_results, show_completed, completed_min)
-
-        # Only cache the default unfiltered call — bypass for any filtered variant.
-        if max_results is not None or not show_completed or completed_min is not None:
+        # Bypass cache for completed_min — rare, specific filter not worth caching.
+        if completed_min is not None:
             return super().get_tasks(tasklist_id, max_results, show_completed, completed_min)
 
-        if tasklist_id not in self._tasks_cache:
-            cache_file = self._tasks_cache_dir / f"{tasklist_id}.json"
-            if cache_file.exists():
-                self._tasks_cache[tasklist_id] = BidictCache(cache_file)
-            else:
-                tasks = super().get_tasks(tasklist_id)
-                cache = BidictCache(cache_file)
-                cache.overwrite(self._dedup_by_title(tasks, "task"))
-                self._tasks_cache[tasklist_id] = cache
+        cached = self._tasks_cache.get(tasklist_id)
+        if cached is None:
+            # Fetch all tasks once (completed + needsAction) so the cache serves all callers.
+            cached = super().get_tasks(tasklist_id, show_completed=True)
+            self._tasks_cache.set(tasklist_id, cached)
 
-        cache = self._tasks_cache[tasklist_id]
-        return [{"title": t, "id": i} for t, i in cache.items()]
+        result = cached if show_completed else [t for t in cached if t.get("status") != "completed"]
+        return result[:max_results] if max_results is not None else result
+
+    @override
+    def add_task(
+        self,
+        tasklist_id: str,
+        title: str,
+        notes: str | None = None,
+        due: str | None = None,
+    ) -> "Task":
+        task = super().add_task(tasklist_id, title, notes, due)
+        self._tasks_cache.invalidate(tasklist_id)
+        return task
+
+    @override
+    def complete_task(self, tasklist_id: str, task_id: str) -> "Task":
+        task = super().complete_task(tasklist_id, task_id)
+        self._tasks_cache.invalidate(tasklist_id)
+        return task
+
+    @override
+    def delete_task(self, tasklist_id: str, task_id: str) -> None:
+        super().delete_task(tasklist_id, task_id)
+        self._tasks_cache.invalidate(tasklist_id)
 
     @override
     def resolve_task_from_title(self, title: str, tasklist_id: str) -> list["Task"]:
@@ -100,9 +112,6 @@ class CachedApiClient(ApiClient):
         # explicitly when the cache is stale.
         # TODO: Add async functionality.
         """
-        if self._tasks_cache_dir.exists():
-            for f in self._tasks_cache_dir.glob("*.json"):
-                f.unlink()
         self._tasks_cache.clear()
         self._title_id_cache.clear()
         return self.get_tasklists()

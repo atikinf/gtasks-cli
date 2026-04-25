@@ -5,6 +5,7 @@ import pytest
 
 from gtasks.client.cached_api_client import CachedApiClient
 from gtasks.utils.bidict_cache import BidictCache
+from gtasks.utils.tasks_cache import TasksCache
 
 
 @pytest.fixture
@@ -25,17 +26,22 @@ def populated_cache() -> BidictCache:
 
 
 @pytest.fixture
+def tasks_cache(tmp_path: Path) -> TasksCache:
+    return TasksCache(tmp_path / "tasks")
+
+
+@pytest.fixture
 def client_empty_cache(
-    service: MagicMock, empty_cache: BidictCache, tmp_path: Path
+    service: MagicMock, empty_cache: BidictCache, tasks_cache: TasksCache
 ) -> CachedApiClient:
-    return CachedApiClient(service, empty_cache, tmp_path, {})
+    return CachedApiClient(service, empty_cache, tasks_cache)
 
 
 @pytest.fixture
 def client_populated_cache(
-    service: MagicMock, populated_cache: BidictCache, tmp_path: Path
+    service: MagicMock, populated_cache: BidictCache, tasks_cache: TasksCache
 ) -> CachedApiClient:
-    return CachedApiClient(service, populated_cache, tmp_path, {})
+    return CachedApiClient(service, populated_cache, tasks_cache)
 
 
 class TestCachedGetTasklists:
@@ -90,31 +96,100 @@ class TestCachedGetTasklists:
 
 
 class TestCachedGetTasks:
-    # Task cache is bypassed pending a richer cache that stores full task metadata
-    # (due dates, notes, status). All get_tasks calls go to the API.
     SAMPLE_TASKS = [
-        {"id": "task1", "title": "Buy milk"},
-        {"id": "task2", "title": "Walk dog"},
+        {"id": "task1", "title": "Buy milk", "status": "needsAction"},
+        {"id": "task2", "title": "Walk dog", "status": "needsAction"},
+    ]
+    SAMPLE_TASKS_WITH_COMPLETED = [
+        {"id": "task1", "title": "Buy milk", "status": "needsAction"},
+        {"id": "task2", "title": "Walk dog", "status": "completed"},
     ]
 
-    def test_GIVEN_any_call_THEN_always_fetches_from_api(
-        self, client_empty_cache: CachedApiClient, service: MagicMock
+    def test_GIVEN_cache_miss_THEN_fetches_from_api_and_caches(
+        self, client_empty_cache: CachedApiClient, service: MagicMock, tasks_cache: TasksCache
     ) -> None:
         service.tasks().list().execute.return_value = {"items": self.SAMPLE_TASKS}
 
         result = client_empty_cache.get_tasks("list1")
 
         service.tasks().list.assert_called()
-        assert self.SAMPLE_TASKS == result
+        assert result == self.SAMPLE_TASKS
+        assert tasks_cache.get("list1") == self.SAMPLE_TASKS
 
-    def test_GIVEN_filtered_params_THEN_passes_through_to_api(
-        self, client_empty_cache: CachedApiClient, service: MagicMock
+    def test_GIVEN_cache_hit_THEN_returns_from_cache_without_api_call(
+        self, client_empty_cache: CachedApiClient, service: MagicMock, tasks_cache: TasksCache
     ) -> None:
-        service.tasks().list().execute.return_value = {"items": self.SAMPLE_TASKS}
+        tasks_cache.set("list1", self.SAMPLE_TASKS)
 
-        client_empty_cache.get_tasks("list1", max_results=1, show_completed=False)
+        result = client_empty_cache.get_tasks("list1")
+
+        service.tasks().list.assert_not_called()
+        assert result == self.SAMPLE_TASKS
+
+    def test_GIVEN_show_completed_false_THEN_filters_completed_from_cache(
+        self, client_empty_cache: CachedApiClient, service: MagicMock, tasks_cache: TasksCache
+    ) -> None:
+        tasks_cache.set("list1", self.SAMPLE_TASKS_WITH_COMPLETED)
+
+        result = client_empty_cache.get_tasks("list1", show_completed=False)
+
+        service.tasks().list.assert_not_called()
+        assert result == [{"id": "task1", "title": "Buy milk", "status": "needsAction"}]
+
+    def test_GIVEN_max_results_THEN_truncates_cached_result(
+        self, client_empty_cache: CachedApiClient, tasks_cache: TasksCache
+    ) -> None:
+        tasks_cache.set("list1", self.SAMPLE_TASKS)
+
+        result = client_empty_cache.get_tasks("list1", max_results=1)
+
+        assert len(result) == 1
+
+    def test_GIVEN_completed_min_THEN_bypasses_cache(
+        self, client_empty_cache: CachedApiClient, service: MagicMock, tasks_cache: TasksCache
+    ) -> None:
+        tasks_cache.set("list1", self.SAMPLE_TASKS)
+        service.tasks().list().execute.return_value = {"items": []}
+
+        client_empty_cache.get_tasks("list1", completed_min="2026-01-01T00:00:00Z")
 
         service.tasks().list.assert_called()
+
+
+class TestCachedGetTasksMutationInvalidation:
+    SAMPLE_TASKS = [
+        {"id": "task1", "title": "Buy milk", "status": "needsAction"},
+    ]
+
+    def test_add_task_THEN_invalidates_cache(
+        self, client_empty_cache: CachedApiClient, service: MagicMock, tasks_cache: TasksCache
+    ) -> None:
+        tasks_cache.set("list1", self.SAMPLE_TASKS)
+        service.tasks().insert().execute.return_value = {"id": "task2", "title": "New"}
+
+        client_empty_cache.add_task("list1", "New")
+
+        assert tasks_cache.get("list1") is None
+
+    def test_complete_task_THEN_invalidates_cache(
+        self, client_empty_cache: CachedApiClient, service: MagicMock, tasks_cache: TasksCache
+    ) -> None:
+        tasks_cache.set("list1", self.SAMPLE_TASKS)
+        service.tasks().patch().execute.return_value = {}
+
+        client_empty_cache.complete_task("list1", "task1")
+
+        assert tasks_cache.get("list1") is None
+
+    def test_delete_task_THEN_invalidates_cache(
+        self, client_empty_cache: CachedApiClient, service: MagicMock, tasks_cache: TasksCache
+    ) -> None:
+        tasks_cache.set("list1", self.SAMPLE_TASKS)
+        service.tasks().delete().execute.return_value = None
+
+        client_empty_cache.delete_task("list1", "task1")
+
+        assert tasks_cache.get("list1") is None
 
 
 class TestCachedResolveTasklistId:
@@ -146,8 +221,8 @@ class TestCachedResolveTasklistId:
 
 class TestCachedResolveTaskFromTitle:
     SAMPLE_TASKS = [
-        {"id": "task1", "title": "Buy milk"},
-        {"id": "task2", "title": "Walk dog"},
+        {"id": "task1", "title": "Buy milk", "status": "needsAction"},
+        {"id": "task2", "title": "Walk dog", "status": "needsAction"},
     ]
 
     def test_GIVEN_matching_title_THEN_returns_task(
@@ -157,7 +232,7 @@ class TestCachedResolveTaskFromTitle:
 
         result = client_empty_cache.resolve_task_from_title("Buy milk", "list1")
 
-        assert result == [{"title": "Buy milk", "id": "task1"}]
+        assert result == [{"id": "task1", "title": "Buy milk", "status": "needsAction"}]
 
     def test_GIVEN_case_insensitive_title_THEN_returns_task(
         self, client_empty_cache: CachedApiClient, service: MagicMock
@@ -166,7 +241,7 @@ class TestCachedResolveTaskFromTitle:
 
         result = client_empty_cache.resolve_task_from_title("buy MILK", "list1")
 
-        assert result == [{"title": "Buy milk", "id": "task1"}]
+        assert result == [{"id": "task1", "title": "Buy milk", "status": "needsAction"}]
 
     def test_GIVEN_no_match_THEN_returns_empty(
         self, client_empty_cache: CachedApiClient, service: MagicMock
@@ -174,3 +249,13 @@ class TestCachedResolveTaskFromTitle:
         service.tasks().list().execute.return_value = {"items": self.SAMPLE_TASKS}
 
         assert client_empty_cache.resolve_task_from_title("Nonexistent", "list1") == []
+
+    def test_GIVEN_cache_populated_THEN_resolves_without_api_call(
+        self, client_empty_cache: CachedApiClient, service: MagicMock, tasks_cache: TasksCache
+    ) -> None:
+        tasks_cache.set("list1", self.SAMPLE_TASKS)
+
+        result = client_empty_cache.resolve_task_from_title("Buy milk", "list1")
+
+        service.tasks().list.assert_not_called()
+        assert result == [{"id": "task1", "title": "Buy milk", "status": "needsAction"}]

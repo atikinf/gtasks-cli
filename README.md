@@ -16,7 +16,6 @@ Since you need to authenticate with your own API credentials, run `uv run gtasks
 * **High Prio:** Add deletion/completion by list number + multi-task operations, look into batched API calls.
 * Verify `gtasks auth` end-to-end functionality.
 * "Show completed" mode — fetch needsAction tasks, then read recently-completed tasks from a local cache (populated by `gtasks done`) to append as strikethrough. Avoids a second API call. Configurable via `gtasks config`.
-* Extend the task cache to include full task metadata (due dates, notes, status) so display commands don't need to hit the API.
 * Add undo functionality, store recent history on disk for undo purposes.
 
 *Stretch Goals*:
