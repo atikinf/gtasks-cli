@@ -191,6 +191,66 @@ class TestCachedGetTasksMutationInvalidation:
 
         assert tasks_cache.get("list1") is None
 
+    def test_complete_tasks_THEN_invalidates_cache(
+        self, client_empty_cache: CachedApiClient, service: MagicMock, tasks_cache: TasksCache
+    ) -> None:
+        tasks_cache.set("list1", self.SAMPLE_TASKS)
+        batch_mock = MagicMock()
+        service.new_batch_http_request.return_value = batch_mock
+
+        client_empty_cache.complete_tasks("list1", self.SAMPLE_TASKS)
+
+        assert tasks_cache.get("list1") is None
+
+    def test_complete_tasks_GIVEN_batch_error_THEN_still_invalidates_cache(
+        self, client_empty_cache: CachedApiClient, service: MagicMock, tasks_cache: TasksCache
+    ) -> None:
+        tasks_cache.set("list1", self.SAMPLE_TASKS)
+
+        def fake_execute_with_error():
+            cb = service.new_batch_http_request.call_args.kwargs.get("callback")
+            if cb:
+                cb("0", None, Exception("API error"))
+
+        batch_mock = MagicMock()
+        batch_mock.execute.side_effect = fake_execute_with_error
+        service.new_batch_http_request.return_value = batch_mock
+
+        with pytest.raises(ExceptionGroup):
+            client_empty_cache.complete_tasks("list1", self.SAMPLE_TASKS)
+
+        assert tasks_cache.get("list1") is None
+
+    def test_delete_tasks_THEN_invalidates_cache(
+        self, client_empty_cache: CachedApiClient, service: MagicMock, tasks_cache: TasksCache
+    ) -> None:
+        tasks_cache.set("list1", self.SAMPLE_TASKS)
+        batch_mock = MagicMock()
+        service.new_batch_http_request.return_value = batch_mock
+
+        client_empty_cache.delete_tasks("list1", self.SAMPLE_TASKS)
+
+        assert tasks_cache.get("list1") is None
+
+    def test_delete_tasks_GIVEN_batch_error_THEN_still_invalidates_cache(
+        self, client_empty_cache: CachedApiClient, service: MagicMock, tasks_cache: TasksCache
+    ) -> None:
+        tasks_cache.set("list1", self.SAMPLE_TASKS)
+
+        def fake_execute_with_error():
+            cb = service.new_batch_http_request.call_args.kwargs.get("callback")
+            if cb:
+                cb("0", None, Exception("API error"))
+
+        batch_mock = MagicMock()
+        batch_mock.execute.side_effect = fake_execute_with_error
+        service.new_batch_http_request.return_value = batch_mock
+
+        with pytest.raises(ExceptionGroup):
+            client_empty_cache.delete_tasks("list1", self.SAMPLE_TASKS)
+
+        assert tasks_cache.get("list1") is None
+
 
 class TestCachedResolveTasklistId:
     def test_GIVEN_title_in_cache_THEN_returns_matching_dict(

@@ -11,6 +11,8 @@ from pytest import CaptureFixture
 from gtasks.cli.cli import build_parser
 from gtasks.cli.parsers.add_parser import cmd_add_task
 from gtasks.cli.parsers.config_parser import cmd_config
+from gtasks.cli.parsers.delete_parser import cmd_delete
+from gtasks.cli.parsers.done_parser import cmd_done
 from gtasks.cli.parsers.lists_parser import cmd_list_tasklists
 from gtasks.cli.parsers.tasks_parser import cmd_list_tasks
 from gtasks.utils.config import Config, ConfigKey
@@ -159,6 +161,68 @@ class TestListsParserArgs:
 
         assert args.limit == expected_limit
         assert args.show_ids == expected_show_ids
+
+
+class TestDoneParserArgs:
+    """Test argument parsing for the 'done' subcommand."""
+
+    def test_done_GIVEN_single_title_THEN_parses(
+        self, parser: argparse.ArgumentParser
+    ) -> None:
+        args = parser.parse_args(["done", "Buy milk"])
+
+        assert args.command == "done"
+        assert args.tasks == ["Buy milk"]
+        assert args.tasklist_title is None
+
+    def test_done_GIVEN_multiple_titles_THEN_parses(
+        self, parser: argparse.ArgumentParser
+    ) -> None:
+        args = parser.parse_args(["done", "Buy milk", "Walk dog"])
+
+        assert args.tasks == ["Buy milk", "Walk dog"]
+
+    def test_done_GIVEN_index_inputs_THEN_parses_as_strings(
+        self, parser: argparse.ArgumentParser
+    ) -> None:
+        args = parser.parse_args(["done", "1", "3"])
+
+        assert args.tasks == ["1", "3"]
+
+    def test_done_GIVEN_tasklist_flag_THEN_parses(
+        self, parser: argparse.ArgumentParser
+    ) -> None:
+        args = parser.parse_args(["done", "Task", "-l", "Work"])
+
+        assert args.tasks == ["Task"]
+        assert args.tasklist_title == "Work"
+
+
+class TestDeleteParserArgs:
+    """Test argument parsing for the 'delete' subcommand."""
+
+    def test_delete_GIVEN_single_title_THEN_parses(
+        self, parser: argparse.ArgumentParser
+    ) -> None:
+        args = parser.parse_args(["delete", "Buy milk"])
+
+        assert args.command == "delete"
+        assert args.tasks == ["Buy milk"]
+        assert args.tasklist_title is None
+
+    def test_delete_GIVEN_multiple_titles_THEN_parses(
+        self, parser: argparse.ArgumentParser
+    ) -> None:
+        args = parser.parse_args(["delete", "Buy milk", "Walk dog"])
+
+        assert args.tasks == ["Buy milk", "Walk dog"]
+
+    def test_delete_GIVEN_index_inputs_THEN_parses_as_strings(
+        self, parser: argparse.ArgumentParser
+    ) -> None:
+        args = parser.parse_args(["delete", "2", "4"])
+
+        assert args.tasks == ["2", "4"]
 
 
 class TestUseParserArgs:
@@ -617,3 +681,108 @@ class TestCmdConfig:
 
         assert exc.value.code == 1
         assert "Unknown key" in capsys.readouterr().out
+
+
+class TestCmdDone:
+    """Test the cmd_done command handler."""
+
+    SAMPLE_TASKS = [
+        {"id": "task1", "title": "Buy milk", "status": "needsAction"},
+        {"id": "task2", "title": "Walk dog", "status": "needsAction"},
+    ]
+
+    def test_cmd_done_GIVEN_single_title_THEN_completes_task_and_prints_title(
+        self, mock_client: Mock, config: Config, capsys: CaptureFixture[str]
+    ) -> None:
+        config.set(ConfigKey.DEFAULT_TASKLIST_TITLE, "Work")
+        mock_client.resolve_tasklist_from_title.return_value = [{"id": "list1", "title": "Work"}]
+        mock_client.resolve_task_from_title.return_value = [self.SAMPLE_TASKS[0]]
+        mock_client.complete_tasks.return_value = [
+            {"id": "task1", "title": "Buy milk", "status": "completed"}
+        ]
+        args = argparse.Namespace(tasks=["Buy milk"], tasklist_title=None)
+
+        cmd_done(args, mock_client, config)
+
+        mock_client.complete_tasks.assert_called_once_with("list1", [self.SAMPLE_TASKS[0]])
+        assert "Completed: Buy milk" in capsys.readouterr().out
+
+    def test_cmd_done_GIVEN_multiple_indices_THEN_completes_all_and_prints_titles(
+        self, mock_client: Mock, config: Config, capsys: CaptureFixture[str]
+    ) -> None:
+        config.set(ConfigKey.DEFAULT_TASKLIST_TITLE, "Work")
+        mock_client.resolve_tasklist_from_title.return_value = [{"id": "list1", "title": "Work"}]
+        mock_client.get_tasks.return_value = self.SAMPLE_TASKS
+        mock_client.complete_tasks.return_value = [
+            {"id": "task1", "title": "Buy milk", "status": "completed"},
+            {"id": "task2", "title": "Walk dog", "status": "completed"},
+        ]
+        args = argparse.Namespace(tasks=["1", "2"], tasklist_title=None)
+
+        cmd_done(args, mock_client, config)
+
+        mock_client.complete_tasks.assert_called_once_with("list1", self.SAMPLE_TASKS)
+        output = capsys.readouterr().out
+        assert "Completed:" in output
+        assert "Buy milk" in output
+        assert "Walk dog" in output
+
+    def test_cmd_done_GIVEN_no_tasklist_THEN_exits(
+        self, mock_client: Mock, config: Config
+    ) -> None:
+        args = argparse.Namespace(tasks=["Buy milk"], tasklist_title=None)
+
+        with pytest.raises(SystemExit) as exc:
+            cmd_done(args, mock_client, config)
+
+        assert exc.value.code == 1
+
+
+class TestCmdDelete:
+    """Test the cmd_delete command handler."""
+
+    SAMPLE_TASKS = [
+        {"id": "task1", "title": "Buy milk", "status": "needsAction"},
+        {"id": "task2", "title": "Walk dog", "status": "needsAction"},
+    ]
+
+    def test_cmd_delete_GIVEN_single_title_THEN_deletes_task_and_prints_title(
+        self, mock_client: Mock, config: Config, capsys: CaptureFixture[str]
+    ) -> None:
+        config.set(ConfigKey.DEFAULT_TASKLIST_TITLE, "Work")
+        mock_client.resolve_tasklist_from_title.return_value = [{"id": "list1", "title": "Work"}]
+        mock_client.resolve_task_from_title.return_value = [self.SAMPLE_TASKS[0]]
+        mock_client.delete_tasks.return_value = [self.SAMPLE_TASKS[0]]
+        args = argparse.Namespace(tasks=["Buy milk"], tasklist_title=None)
+
+        cmd_delete(args, mock_client, config)
+
+        mock_client.delete_tasks.assert_called_once_with("list1", [self.SAMPLE_TASKS[0]])
+        assert "Deleted: Buy milk" in capsys.readouterr().out
+
+    def test_cmd_delete_GIVEN_multiple_indices_THEN_deletes_all_and_prints_titles(
+        self, mock_client: Mock, config: Config, capsys: CaptureFixture[str]
+    ) -> None:
+        config.set(ConfigKey.DEFAULT_TASKLIST_TITLE, "Work")
+        mock_client.resolve_tasklist_from_title.return_value = [{"id": "list1", "title": "Work"}]
+        mock_client.get_tasks.return_value = self.SAMPLE_TASKS
+        mock_client.delete_tasks.return_value = self.SAMPLE_TASKS
+        args = argparse.Namespace(tasks=["1", "2"], tasklist_title=None)
+
+        cmd_delete(args, mock_client, config)
+
+        mock_client.delete_tasks.assert_called_once_with("list1", self.SAMPLE_TASKS)
+        output = capsys.readouterr().out
+        assert "Deleted:" in output
+        assert "Buy milk" in output
+        assert "Walk dog" in output
+
+    def test_cmd_delete_GIVEN_no_tasklist_THEN_exits(
+        self, mock_client: Mock, config: Config
+    ) -> None:
+        args = argparse.Namespace(tasks=["Buy milk"], tasklist_title=None)
+
+        with pytest.raises(SystemExit) as exc:
+            cmd_delete(args, mock_client, config)
+
+        assert exc.value.code == 1

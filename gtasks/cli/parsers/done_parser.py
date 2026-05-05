@@ -4,13 +4,13 @@ import argparse
 import sys
 from functools import partial
 
-from gtasks.cli.cli_utils import prompt_choose_task_id, prompt_choose_tasklist_id
+from gtasks.cli.cli_utils import prompt_choose_tasklist_id, resolve_tasks_from_inputs
 from gtasks.client.api_client import ApiClient
 from gtasks.utils.config import Config, ConfigKey
 
 
 def cmd_done(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
-    """Handle the 'done' command to mark a task complete."""
+    """Handle the 'done' command to mark one or more tasks complete."""
     tasklist_title: None | str = args.tasklist_title or cfg.get(ConfigKey.DEFAULT_TASKLIST_TITLE)
     if tasklist_title is None:
         print("Error: You must specify a --tasklist-title (-l) or set a default tasklist")
@@ -22,27 +22,31 @@ def cmd_done(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
         print(f"Couldn't find a tasklist named '{tasklist_title}'")
         return
 
-    matches = client.resolve_task_from_title(args.title, tasklist_id)
-    task_ids = [t["id"] for t in matches if t.get("id")]
-    task_id = prompt_choose_task_id(task_ids, matches, args.title)
-    if task_id is None:
+    tasks = resolve_tasks_from_inputs(args.tasks, client, tasklist_id)
+    if not tasks:
         return
 
-    client.complete_task(tasklist_id, task_id)
-    print(f"Completed: {args.title}")
+    completed = client.complete_tasks(tasklist_id, tasks)
+    if len(completed) == 1:
+        print(f"Completed: {completed[0].get('title', '?')}")
+    else:
+        print("Completed:")
+        for t in completed:
+            print(f"    {t.get('title', '?')}")
 
 
 def add_subparser_done(subparsers, client: ApiClient, cfg: Config) -> None:
-    """Add the 'done' subcommand to mark a task as complete."""
+    """Add the 'done' subcommand to mark one or more tasks as complete."""
     done_parser = subparsers.add_parser(
         "done",
-        help="Mark a task as complete",
-        description="Mark a task as complete by title.",
+        help="Mark one or more tasks as complete",
+        description="Mark tasks complete by title or display index (e.g. 'gtasks done 1 3' or 'gtasks done \"Buy milk\"').",  # noqa: E501
     )
     done_parser.add_argument(
-        "title",
+        "tasks",
         type=str,
-        help="Title of the task to mark complete",
+        nargs="+",
+        help="Titles or 1-based display indices of tasks to mark complete",
     )
     done_parser.add_argument(
         "-l",

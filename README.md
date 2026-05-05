@@ -13,7 +13,6 @@ Since you need to authenticate with your own API credentials, run `uv run gtasks
 
 **TODO**:
 * **High Prio:** Add better doc explaining how to download/configure a `credentials.json` for new users. À la [gcalcli](https://github.com/insanum/gcalcli/blob/HEAD/docs/api-auth.md).
-* **High Prio:** Add deletion/completion by list number + multi-task operations, look into batched API calls.
 * Verify `gtasks auth` end-to-end functionality.
 * "Show completed" mode — fetch needsAction tasks, then read recently-completed tasks from a local cache (populated by `gtasks done`) to append as strikethrough. Avoids a second API call. Configurable via `gtasks config`.
 * Add undo functionality, store recent history on disk for undo purposes.
@@ -22,3 +21,4 @@ Since you need to authenticate with your own API credentials, run `uv run gtasks
 * Tab-autocomplete leveraging the tasklists cache
 * Pretty formatting
 * Async cache refresh
+* Benchmark startup latency — profile lazy-importing `dateparser`, `googleapiclient.discovery`, and `google_auth_oauthlib.flow`.

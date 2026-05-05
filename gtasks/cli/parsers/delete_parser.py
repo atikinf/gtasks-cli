@@ -1,16 +1,16 @@
-"""Delete subcommand - delete a task by name."""
+"""Delete subcommand - delete tasks by name or display index."""
 
 import argparse
 import sys
 from functools import partial
 
-from gtasks.cli.cli_utils import prompt_choose_task_id, prompt_choose_tasklist_id
+from gtasks.cli.cli_utils import prompt_choose_tasklist_id, resolve_tasks_from_inputs
 from gtasks.client.api_client import ApiClient
 from gtasks.utils.config import Config, ConfigKey
 
 
 def cmd_delete(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
-    """Handle the 'delete' command to remove a task."""
+    """Handle the 'delete' command to remove one or more tasks."""
     tasklist_title: None | str = args.tasklist_title or cfg.get(ConfigKey.DEFAULT_TASKLIST_TITLE)
     if tasklist_title is None:
         print("Error: You must specify a --tasklist-title (-l) or set a default tasklist")
@@ -22,27 +22,31 @@ def cmd_delete(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None
         print(f"Couldn't find a tasklist named '{tasklist_title}'")
         return
 
-    matches = client.resolve_task_from_title(args.title, tasklist_id)
-    task_ids = [t["id"] for t in matches if t.get("id")]
-    task_id = prompt_choose_task_id(task_ids, matches, args.title)
-    if task_id is None:
+    tasks = resolve_tasks_from_inputs(args.tasks, client, tasklist_id)
+    if not tasks:
         return
 
-    client.delete_task(tasklist_id, task_id)
-    print(f"Deleted: {args.title}")
+    deleted = client.delete_tasks(tasklist_id, tasks)
+    if len(deleted) == 1:
+        print(f"Deleted: {deleted[0].get('title', '?')}")
+    else:
+        print("Deleted:")
+        for t in deleted:
+            print(f"    {t.get('title', '?')}")
 
 
 def add_subparser_delete(subparsers, client: ApiClient, cfg: Config) -> None:
-    """Add the 'delete' subcommand to remove a task."""
+    """Add the 'delete' subcommand to remove one or more tasks."""
     delete_parser = subparsers.add_parser(
         "delete",
-        help="Delete a task",
-        description="Delete a task by title.",
+        help="Delete one or more tasks",
+        description="Delete tasks by title or display index (e.g. 'gtasks delete 1 3' or 'gtasks delete \"Buy milk\"').",  # noqa: E501
     )
     delete_parser.add_argument(
-        "title",
+        "tasks",
         type=str,
-        help="Title of the task to delete",
+        nargs="+",
+        help="Titles or 1-based display indices of tasks to delete",
     )
     delete_parser.add_argument(
         "-l",

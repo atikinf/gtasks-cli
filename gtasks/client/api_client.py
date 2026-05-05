@@ -74,9 +74,48 @@ class ApiClient:
             body={"status": Status.COMPLETED.value},
         ).execute()
 
+    def complete_tasks(self, tasklist_id: str, tasks: list["Task"]) -> list["Task"]:
+        results: list[Task] = []
+        errors: list[Exception] = []
+
+        def _cb(request_id: str, response: "Task", exception: Exception | None) -> None:
+            if exception is not None:
+                errors.append(exception)
+            elif response:
+                results.append(response)
+
+        batch = self._service.new_batch_http_request(callback=_cb)
+        for task in tasks:
+            batch.add(
+                self._service.tasks().patch(
+                    tasklist=tasklist_id,
+                    task=task["id"],
+                    body={"status": Status.COMPLETED.value},
+                )
+            )
+        batch.execute()
+        if errors:
+            raise ExceptionGroup("batch complete_tasks failed", errors)
+        return results
+
     def delete_task(self, tasklist_id: str, task_id: str) -> None:
         tasks_resource = self._service.tasks()
         tasks_resource.delete(tasklist=tasklist_id, task=task_id).execute()
+
+    def delete_tasks(self, tasklist_id: str, tasks: list["Task"]) -> list["Task"]:
+        errors: list[Exception] = []
+
+        def _cb(request_id: str, response: object, exception: Exception | None) -> None:
+            if exception is not None:
+                errors.append(exception)
+
+        batch = self._service.new_batch_http_request(callback=_cb)
+        for task in tasks:
+            batch.add(self._service.tasks().delete(tasklist=tasklist_id, task=task["id"]))
+        batch.execute()
+        if errors:
+            raise ExceptionGroup("batch delete_tasks failed", errors)
+        return tasks
 
     def _pagination_loop(
         self, kwargs_init: dict[str, Any], max_results: int | None, listable_resource

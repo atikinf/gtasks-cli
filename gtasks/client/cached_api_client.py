@@ -76,9 +76,23 @@ class CachedApiClient(ApiClient):
         return task
 
     @override
+    def complete_tasks(self, tasklist_id: str, tasks: list["Task"]) -> list["Task"]:
+        try:
+            return super().complete_tasks(tasklist_id, tasks)
+        finally:
+            self._tasks_cache.invalidate(tasklist_id)
+
+    @override
     def delete_task(self, tasklist_id: str, task_id: str) -> None:
         super().delete_task(tasklist_id, task_id)
         self._tasks_cache.invalidate(tasklist_id)
+
+    @override
+    def delete_tasks(self, tasklist_id: str, tasks: list["Task"]) -> list["Task"]:
+        try:
+            return super().delete_tasks(tasklist_id, tasks)
+        finally:
+            self._tasks_cache.invalidate(tasklist_id)
 
     @override
     def resolve_task_from_title(self, title: str, tasklist_id: str) -> list["Task"]:

@@ -294,3 +294,106 @@ class TestDeleteTask:
         service.tasks().delete(
             tasklist=self.TASKLIST_ID, task=self.TASK_ID
         ).execute.assert_called_once()
+
+
+class TestDeleteTasks:
+    TASKLIST_ID = "tasklist123"
+    SAMPLE_TASKS = [
+        {"id": "task1", "title": "Buy milk"},
+        {"id": "task2", "title": "Walk dog"},
+        {"id": "task3", "title": "Call dentist"},
+    ]
+
+    def test_delete_tasks_GIVEN_multiple_tasks_THEN_batches_deletes(
+        self, service: MagicMock, api_client: ApiClient
+    ) -> None:
+        batch_mock = MagicMock()
+        service.new_batch_http_request.return_value = batch_mock
+
+        api_client.delete_tasks(self.TASKLIST_ID, self.SAMPLE_TASKS)
+
+        service.new_batch_http_request.assert_called_once()
+        assert batch_mock.add.call_count == 3
+        batch_mock.execute.assert_called_once()
+
+    def test_delete_tasks_GIVEN_tasks_THEN_returns_same_tasks(
+        self, service: MagicMock, api_client: ApiClient
+    ) -> None:
+        batch_mock = MagicMock()
+        service.new_batch_http_request.return_value = batch_mock
+
+        result = api_client.delete_tasks(self.TASKLIST_ID, self.SAMPLE_TASKS[:1])
+
+        assert result == self.SAMPLE_TASKS[:1]
+
+    def test_delete_tasks_GIVEN_batch_error_THEN_raises_exception_group(
+        self, service: MagicMock, api_client: ApiClient
+    ) -> None:
+        def fake_execute_with_error():
+            cb = service.new_batch_http_request.call_args.kwargs.get("callback")
+            if cb:
+                cb("0", None, Exception("API error"))
+
+        batch_mock = MagicMock()
+        batch_mock.execute.side_effect = fake_execute_with_error
+        service.new_batch_http_request.return_value = batch_mock
+
+        with pytest.raises(ExceptionGroup):
+            api_client.delete_tasks(self.TASKLIST_ID, self.SAMPLE_TASKS[:1])
+
+
+class TestCompleteTasks:
+    TASKLIST_ID = "tasklist123"
+    SAMPLE_TASKS = [
+        {"id": "task1", "title": "Buy milk"},
+        {"id": "task2", "title": "Walk dog"},
+    ]
+
+    def test_complete_tasks_GIVEN_multiple_tasks_THEN_batches_patches(
+        self, service: MagicMock, api_client: ApiClient
+    ) -> None:
+        batch_mock = MagicMock()
+        service.new_batch_http_request.return_value = batch_mock
+
+        api_client.complete_tasks(self.TASKLIST_ID, self.SAMPLE_TASKS)
+
+        service.new_batch_http_request.assert_called_once()
+        assert batch_mock.add.call_count == 2
+        batch_mock.execute.assert_called_once()
+
+    def test_complete_tasks_GIVEN_callback_receives_responses_THEN_returns_them(
+        self, service: MagicMock, api_client: ApiClient
+    ) -> None:
+        completed_tasks = [
+            {"id": "task1", "status": "completed"},
+            {"id": "task2", "status": "completed"},
+        ]
+
+        def fake_execute_with_callbacks():
+            cb = service.new_batch_http_request.call_args.kwargs.get("callback")
+            if cb:
+                cb("0", completed_tasks[0], None)
+                cb("1", completed_tasks[1], None)
+
+        batch_mock = MagicMock()
+        batch_mock.execute.side_effect = fake_execute_with_callbacks
+        service.new_batch_http_request.return_value = batch_mock
+
+        results = api_client.complete_tasks(self.TASKLIST_ID, self.SAMPLE_TASKS)
+
+        assert results == completed_tasks
+
+    def test_complete_tasks_GIVEN_batch_error_THEN_raises_exception_group(
+        self, service: MagicMock, api_client: ApiClient
+    ) -> None:
+        def fake_execute_with_error():
+            cb = service.new_batch_http_request.call_args.kwargs.get("callback")
+            if cb:
+                cb("0", None, Exception("API error"))
+
+        batch_mock = MagicMock()
+        batch_mock.execute.side_effect = fake_execute_with_error
+        service.new_batch_http_request.return_value = batch_mock
+
+        with pytest.raises(ExceptionGroup):
+            api_client.complete_tasks(self.TASKLIST_ID, self.SAMPLE_TASKS[:1])
