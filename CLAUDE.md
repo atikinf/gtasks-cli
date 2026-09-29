@@ -37,8 +37,8 @@ a top-level `set_defaults` pointing at `cmd_list_tasks` with `limit=10`.
 
 - `ApiClient.resolve_tasklist_from_title` (case-insensitive) → `cli_utils.prompt_choose_tasklist_id`
   disambiguates duplicate titles interactively → id.
-- `cli_utils.resolve_tasks_from_inputs` accepts either 1-based *display* indices (matching the
-  numbering `print_tasks` emits; the needsAction list is fetched lazily on the first digit) or
+- `task_resolution.resolve_tasks_from_inputs` accepts either 1-based *display* indices (matching
+  the numbering `print_tasks` emits; the needsAction list is fetched lazily on the first digit) or
   titles, and returns full task objects.
 
 **Batch mutations.** `done` and `delete` accept multiple tasks and issue one

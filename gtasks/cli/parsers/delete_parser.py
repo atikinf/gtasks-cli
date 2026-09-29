@@ -3,7 +3,8 @@
 import argparse
 import sys
 
-from gtasks.cli.cli_utils import prompt_choose_tasklist_id, resolve_tasks_from_inputs
+from gtasks.cli.cli_utils import prompt_choose_tasklist_id
+from gtasks.cli.task_resolution import resolve_tasks_from_inputs
 from gtasks.client.api_client import ApiClient
 from gtasks.utils.config import Config, ConfigKey
 
