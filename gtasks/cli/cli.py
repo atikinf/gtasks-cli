@@ -51,38 +51,3 @@ def build_parser() -> argparse.ArgumentParser:
     add_subparser_auth(subparsers)
 
     return parser
-
-
-"""
-    Goal Example usage:
-
-> gtasks <anything>
-Do you have an API credentials file in `~/.config/gtasks`? See <insert_doc_link>
-> gtasks <anything>
-This is your first time using `gtasks`. Run `gtasks auth` to open a browser tab
-to authenticate your Google account.
-> gtasks config
-<print flags, etc.>
-> gtasks tasks
-==[To Do]==
-1.  Hello
-    ∟ Say hello
-2.  Test
-3.  Yes
-> gtasks add task "Yes" "Descr" [parsed as Title: "Yes", Description: "Descr", optional flags]
-Added task:
-    Yes
-    ∟ Descr
-> gtasks add list "List Name"
-Added list:
-    [List Name]
-> gtasks delete task "Hello"
-Deleted task:
-    Hello
-    ∟ Say hello
-
-TODO
-
-> gtasks complete task "Test"
-< patches task to update status>
-"""

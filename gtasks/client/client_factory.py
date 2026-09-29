@@ -1,6 +1,7 @@
 """Factory functions for building API clients and services."""
 
 import pickle
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -32,7 +33,15 @@ def build_client() -> ApiClient:
     return ApiClient(build_tasks_resource())
 
 
-def auth(token_path: Path, client_id: str, client_secret: str) -> Credentials:
+def _load_or_refresh_creds(
+    token_path: Path, build_flow: Callable[[], InstalledAppFlow]
+) -> Credentials:
+    """Load cached credentials, refreshing or running the OAuth flow as needed.
+
+    `build_flow` is only called when there's no valid cached token, since
+    constructing a flow may require client secrets the caller would rather
+    not gather (e.g. prompting the user) unless they're actually needed.
+    """
     creds: Credentials | None = None
 
     if token_path.exists():
@@ -44,7 +53,19 @@ def auth(token_path: Path, client_id: str, client_secret: str) -> Credentials:
     elif creds and creds.expired and creds.refresh_token:
         creds.refresh(Request())
     else:
-        flow = InstalledAppFlow.from_client_config(
+        flow = build_flow()
+        # Perform auth via local web server and browser-based consent screen.
+        creds = flow.run_local_server()
+
+    write_creds_to_file(creds, token_path)
+    return creds
+
+
+def auth(token_path: Path, client_id: str, client_secret: str) -> Credentials:
+    """Authenticate using an inline client ID/secret (used by `gtasks auth`)."""
+    return _load_or_refresh_creds(
+        token_path,
+        lambda: InstalledAppFlow.from_client_config(
             client_config={
                 "installed": {
                     "client_id": client_id,
@@ -56,37 +77,16 @@ def auth(token_path: Path, client_id: str, client_secret: str) -> Credentials:
                 }
             },
             scopes=SCOPES,
-        )
-        # Perform auth via local web server and browser-based consent screen.
-        creds = flow.run_local_server()
+        ),
+    )
 
-    write_creds_to_file(creds, token_path)
-    return creds
 
-def auth_from_file(
-    token_path: Path,
-    creds_path: Path,
-) -> Credentials:
-    creds: Credentials | None = None
-
-    if token_path.exists():
-        with token_path.open("rb") as token_file:
-            creds = pickle.load(token_file)
-
-    if creds and creds.valid:
-        return creds
-    elif creds and creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-    else:
-        flow = InstalledAppFlow.from_client_secrets_file(
-            str(creds_path),
-            SCOPES,
-        )
-        # Perform auth via local web server and browser-based consent screen.
-        creds = flow.run_local_server()
-
-    write_creds_to_file(creds, token_path)
-    return creds
+def auth_from_file(token_path: Path, creds_path: Path) -> Credentials:
+    """Authenticate using a `credentials.json` file (used by `build_tasks_resource`)."""
+    return _load_or_refresh_creds(
+        token_path,
+        lambda: InstalledAppFlow.from_client_secrets_file(str(creds_path), SCOPES),
+    )
 
 
 def write_creds_to_file(creds: Credentials, token_path: Path) -> None:
