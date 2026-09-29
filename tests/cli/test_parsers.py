@@ -704,7 +704,7 @@ class TestCmdDone:
 
         cmd_done(args, mock_client, config)
 
-        mock_client.complete_tasks.assert_called_once_with("list1", [self.SAMPLE_TASKS[0]])
+        mock_client.complete_tasks.assert_called_once_with("list1", ["task1"])
         assert "Completed: Buy milk" in capsys.readouterr().out
 
     def test_cmd_done_GIVEN_multiple_indices_THEN_completes_all_and_prints_titles(
@@ -721,7 +721,7 @@ class TestCmdDone:
 
         cmd_done(args, mock_client, config)
 
-        mock_client.complete_tasks.assert_called_once_with("list1", self.SAMPLE_TASKS)
+        mock_client.complete_tasks.assert_called_once_with("list1", ["task1", "task2"])
         output = capsys.readouterr().out
         assert "Completed:" in output
         assert "Buy milk" in output
@@ -757,7 +757,7 @@ class TestCmdDelete:
 
         cmd_delete(args, mock_client, config)
 
-        mock_client.delete_tasks.assert_called_once_with("list1", [self.SAMPLE_TASKS[0]])
+        mock_client.delete_tasks.assert_called_once_with("list1", ["task1"])
         assert "Deleted: Buy milk" in capsys.readouterr().out
 
     def test_cmd_delete_GIVEN_multiple_indices_THEN_deletes_all_and_prints_titles(
@@ -771,7 +771,7 @@ class TestCmdDelete:
 
         cmd_delete(args, mock_client, config)
 
-        mock_client.delete_tasks.assert_called_once_with("list1", self.SAMPLE_TASKS)
+        mock_client.delete_tasks.assert_called_once_with("list1", ["task1", "task2"])
         output = capsys.readouterr().out
         assert "Deleted:" in output
         assert "Buy milk" in output

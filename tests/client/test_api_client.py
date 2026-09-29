@@ -279,52 +279,21 @@ class TestAddTask:
         )
 
 
-class TestDeleteTask:
-    TASKLIST_ID = "tasklist123"
-    TASK_ID = "task456"
-
-    def test_delete_task_GIVEN_valid_ids_THEN_calls_delete(
-        self, service: MagicMock, api_client: ApiClient
-    ) -> None:
-        api_client.delete_task(self.TASKLIST_ID, self.TASK_ID)
-
-        service.tasks().delete.assert_called_with(
-            tasklist=self.TASKLIST_ID, task=self.TASK_ID
-        )
-        service.tasks().delete(
-            tasklist=self.TASKLIST_ID, task=self.TASK_ID
-        ).execute.assert_called_once()
-
-
 class TestDeleteTasks:
     TASKLIST_ID = "tasklist123"
-    SAMPLE_TASKS = [
-        {"id": "task1", "title": "Buy milk"},
-        {"id": "task2", "title": "Walk dog"},
-        {"id": "task3", "title": "Call dentist"},
-    ]
+    TASK_IDS = ["task1", "task2", "task3"]
 
-    def test_delete_tasks_GIVEN_multiple_tasks_THEN_batches_deletes(
+    def test_delete_tasks_GIVEN_multiple_ids_THEN_batches_deletes(
         self, service: MagicMock, api_client: ApiClient
     ) -> None:
         batch_mock = MagicMock()
         service.new_batch_http_request.return_value = batch_mock
 
-        api_client.delete_tasks(self.TASKLIST_ID, self.SAMPLE_TASKS)
+        api_client.delete_tasks(self.TASKLIST_ID, self.TASK_IDS)
 
         service.new_batch_http_request.assert_called_once()
         assert batch_mock.add.call_count == 3
         batch_mock.execute.assert_called_once()
-
-    def test_delete_tasks_GIVEN_tasks_THEN_returns_same_tasks(
-        self, service: MagicMock, api_client: ApiClient
-    ) -> None:
-        batch_mock = MagicMock()
-        service.new_batch_http_request.return_value = batch_mock
-
-        result = api_client.delete_tasks(self.TASKLIST_ID, self.SAMPLE_TASKS[:1])
-
-        assert result == self.SAMPLE_TASKS[:1]
 
     def test_delete_tasks_GIVEN_batch_error_THEN_raises_exception_group(
         self, service: MagicMock, api_client: ApiClient
@@ -339,23 +308,20 @@ class TestDeleteTasks:
         service.new_batch_http_request.return_value = batch_mock
 
         with pytest.raises(ExceptionGroup):
-            api_client.delete_tasks(self.TASKLIST_ID, self.SAMPLE_TASKS[:1])
+            api_client.delete_tasks(self.TASKLIST_ID, self.TASK_IDS[:1])
 
 
 class TestCompleteTasks:
     TASKLIST_ID = "tasklist123"
-    SAMPLE_TASKS = [
-        {"id": "task1", "title": "Buy milk"},
-        {"id": "task2", "title": "Walk dog"},
-    ]
+    TASK_IDS = ["task1", "task2"]
 
-    def test_complete_tasks_GIVEN_multiple_tasks_THEN_batches_patches(
+    def test_complete_tasks_GIVEN_multiple_ids_THEN_batches_patches(
         self, service: MagicMock, api_client: ApiClient
     ) -> None:
         batch_mock = MagicMock()
         service.new_batch_http_request.return_value = batch_mock
 
-        api_client.complete_tasks(self.TASKLIST_ID, self.SAMPLE_TASKS)
+        api_client.complete_tasks(self.TASKLIST_ID, self.TASK_IDS)
 
         service.new_batch_http_request.assert_called_once()
         assert batch_mock.add.call_count == 2
@@ -379,7 +345,7 @@ class TestCompleteTasks:
         batch_mock.execute.side_effect = fake_execute_with_callbacks
         service.new_batch_http_request.return_value = batch_mock
 
-        results = api_client.complete_tasks(self.TASKLIST_ID, self.SAMPLE_TASKS)
+        results = api_client.complete_tasks(self.TASKLIST_ID, self.TASK_IDS)
 
         assert results == completed_tasks
 
@@ -396,4 +362,4 @@ class TestCompleteTasks:
         service.new_batch_http_request.return_value = batch_mock
 
         with pytest.raises(ExceptionGroup):
-            api_client.complete_tasks(self.TASKLIST_ID, self.SAMPLE_TASKS[:1])
+            api_client.complete_tasks(self.TASKLIST_ID, self.TASK_IDS[:1])

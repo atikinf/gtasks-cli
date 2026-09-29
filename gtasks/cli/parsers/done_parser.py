@@ -26,7 +26,7 @@ def cmd_done(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
     if not tasks:
         return
 
-    completed = client.complete_tasks(tasklist_id, tasks)
+    completed = client.complete_tasks(tasklist_id, [t["id"] for t in tasks])
     if len(completed) == 1:
         print(f"Completed: {completed[0].get('title', '?')}")
     else:

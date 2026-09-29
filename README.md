@@ -18,7 +18,6 @@ Since you need to authenticate with your own API credentials, run `uv run gtasks
 * Add undo functionality, store recent history on disk for undo purposes.
 
 *Stretch Goals*:
-* Tab-autocomplete leveraging the tasklists cache
+* Tab-autocomplete for task list names
 * Pretty formatting
-* Async cache refresh
 * Benchmark startup latency — profile lazy-importing `dateparser`, `googleapiclient.discovery`, and `google_auth_oauthlib.flow`.

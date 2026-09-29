@@ -26,12 +26,12 @@ def cmd_delete(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None
     if not tasks:
         return
 
-    deleted = client.delete_tasks(tasklist_id, tasks)
-    if len(deleted) == 1:
-        print(f"Deleted: {deleted[0].get('title', '?')}")
+    client.delete_tasks(tasklist_id, [t["id"] for t in tasks])
+    if len(tasks) == 1:
+        print(f"Deleted: {tasks[0].get('title', '?')}")
     else:
         print("Deleted:")
-        for t in deleted:
+        for t in tasks:
             print(f"    {t.get('title', '?')}")
 
 
