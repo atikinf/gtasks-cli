@@ -1,7 +1,6 @@
 """CLI parser building for the Google Tasks CLI."""
 
 import argparse
-from functools import partial
 
 from gtasks.cli.parsers.add_parser import add_subparser_add_task
 from gtasks.cli.parsers.auth_parser import add_subparser_auth
@@ -11,14 +10,18 @@ from gtasks.cli.parsers.done_parser import add_subparser_done
 from gtasks.cli.parsers.lists_parser import add_subparser_lists
 from gtasks.cli.parsers.tasks_parser import add_subparser_tasks, cmd_list_tasks
 from gtasks.cli.parsers.use_parser import add_subparser_use
-from gtasks.client.api_client import ApiClient
-from gtasks.utils.config import Config
 
 _DEFAULT_LIMIT = 10
 
 
-def build_parser(client: ApiClient, cfg: Config) -> argparse.ArgumentParser:
-    """Build and return the argument parser for the CLI."""
+def build_parser() -> argparse.ArgumentParser:
+    """Build and return the argument parser for the CLI.
+
+    Structure only - no client or config is bound here. Every subcommand's
+    `func` is an unbound handler; main() resolves the client/cfg it needs
+    only after parse_args() succeeds, so `--help` and invalid invocations
+    never trigger credential loading or an OAuth flow.
+    """
     parser = argparse.ArgumentParser(
         prog="gtasks",
         description="Command-line interface for Google Tasks",
@@ -26,7 +29,7 @@ def build_parser(client: ApiClient, cfg: Config) -> argparse.ArgumentParser:
 
     # Default: bare `gtasks` shows the first 10 tasks from the default list.
     parser.set_defaults(
-        func=partial(cmd_list_tasks, client=client, cfg=cfg),
+        func=cmd_list_tasks,
         tasklist_title=None,
         limit=_DEFAULT_LIMIT,
         show_ids=False,
@@ -38,13 +41,13 @@ def build_parser(client: ApiClient, cfg: Config) -> argparse.ArgumentParser:
         required=False,
     )
 
-    add_subparser_tasks(subparsers, client, cfg)
-    add_subparser_lists(subparsers, client)
-    add_subparser_add_task(subparsers, client, cfg)
-    add_subparser_use(subparsers, client, cfg)
-    add_subparser_done(subparsers, client, cfg)
-    add_subparser_delete(subparsers, client, cfg)
-    add_subparser_config(subparsers, cfg)
+    add_subparser_tasks(subparsers)
+    add_subparser_lists(subparsers)
+    add_subparser_add_task(subparsers)
+    add_subparser_use(subparsers)
+    add_subparser_done(subparsers)
+    add_subparser_delete(subparsers)
+    add_subparser_config(subparsers)
     add_subparser_auth(subparsers)
 
     return parser

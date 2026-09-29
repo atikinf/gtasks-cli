@@ -10,16 +10,14 @@ from gtasks.utils.config import Config
 
 
 def main(argv: list[str] | None = None) -> int:
-    client = build_client()
-
-    cfg_path = CONFIG_FILE_PATH
-    cfg = Config(cfg_path)
-    parser = build_parser(client, cfg)
-
+    parser = build_parser()
     args = parser.parse_args(argv)
 
+    cfg = Config(CONFIG_FILE_PATH)
+    client = build_client()
+
     try:
-        args.func(args)
+        args.func(args, client=client, cfg=cfg)
         return 0
     except KeyboardInterrupt:
         print("\nOperation cancelled.")

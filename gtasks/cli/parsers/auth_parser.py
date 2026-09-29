@@ -4,8 +4,10 @@ import argparse
 import sys
 
 from gtasks.cli.cli_utils import prompt_setup_credentials
+from gtasks.client.api_client import ApiClient
 from gtasks.client.client_factory import auth
 from gtasks.defaults import APP_CFG_PATH
+from gtasks.utils.config import Config
 
 TOKEN_PATH = APP_CFG_PATH / "token.pickle"
 
@@ -22,8 +24,14 @@ Enter 'q' at any prompt to cancel.
 """
 
 
-def cmd_auth(args: argparse.Namespace) -> None:
-    """Handle the 'auth' command to configure OAuth credentials."""
+def cmd_auth(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
+    """Handle the 'auth' command to configure OAuth credentials.
+
+    Unlike every other command, 'auth' doesn't need an API client or config -
+    it exists to create the credentials those other commands depend on. It
+    still takes both params to match the uniform dispatch signature main()
+    calls args.func with; they're unused here.
+    """
     print(_SETUP_INSTRUCTIONS)
     result = prompt_setup_credentials()
     if result is None:

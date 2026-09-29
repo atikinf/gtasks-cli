@@ -2,7 +2,6 @@
 
 import argparse
 import sys
-from functools import partial
 
 from gtasks.cli.cli_utils import print_tasks, prompt_choose_tasklist_id
 from gtasks.client.api_client import ApiClient
@@ -35,7 +34,7 @@ def cmd_list_tasks(args: argparse.Namespace, client: ApiClient, cfg: Config) -> 
     print_tasks(tasks, args)
 
 
-def add_subparser_tasks(subparsers, client: ApiClient, cfg: Config) -> None:
+def add_subparser_tasks(subparsers) -> None:
     """Add the 'tasks' subcommand to list tasks."""
     tasks_parser = subparsers.add_parser(
         "tasks",
@@ -61,4 +60,4 @@ def add_subparser_tasks(subparsers, client: ApiClient, cfg: Config) -> None:
         action="store_true",
         help="Include task IDs in output",
     )
-    tasks_parser.set_defaults(func=partial(cmd_list_tasks, client=client, cfg=cfg))
+    tasks_parser.set_defaults(func=cmd_list_tasks)

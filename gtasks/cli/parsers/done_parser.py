@@ -2,7 +2,6 @@
 
 import argparse
 import sys
-from functools import partial
 
 from gtasks.cli.cli_utils import prompt_choose_tasklist_id, resolve_tasks_from_inputs
 from gtasks.client.api_client import ApiClient
@@ -35,7 +34,7 @@ def cmd_done(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
             print(f"    {t.get('title', '?')}")
 
 
-def add_subparser_done(subparsers, client: ApiClient, cfg: Config) -> None:
+def add_subparser_done(subparsers) -> None:
     """Add the 'done' subcommand to mark one or more tasks as complete."""
     done_parser = subparsers.add_parser(
         "done",
@@ -55,4 +54,4 @@ def add_subparser_done(subparsers, client: ApiClient, cfg: Config) -> None:
         default=None,
         help="Title of the task list (uses default if not specified)",
     )
-    done_parser.set_defaults(func=partial(cmd_done, client=client, cfg=cfg))
+    done_parser.set_defaults(func=cmd_done)

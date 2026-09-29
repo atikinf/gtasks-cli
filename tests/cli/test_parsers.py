@@ -35,9 +35,9 @@ def mock_client() -> Mock:
 
 
 @pytest.fixture
-def parser(mock_client: Mock, config: Config) -> argparse.ArgumentParser:
+def parser() -> argparse.ArgumentParser:
     """Provide a fully-built argument parser."""
-    return build_parser(mock_client, config)
+    return build_parser()
 
 
 # =============================================================================
@@ -573,6 +573,7 @@ class TestCmdListTasklists:
     def test_cmd_list_tasklists_GIVEN_defaults_THEN_fetches_all(
         self,
         mock_client: Mock,
+        config: Config,
         base_args: dict,
         sample_tasklists: list[dict],
         capsys: CaptureFixture[str],
@@ -580,7 +581,7 @@ class TestCmdListTasklists:
         mock_client.get_tasklists.return_value = sample_tasklists
         args = argparse.Namespace(**base_args)
 
-        cmd_list_tasklists(args, mock_client)
+        cmd_list_tasklists(args, mock_client, config)
 
         mock_client.get_tasklists.assert_called_once_with(None)
         output = capsys.readouterr().out
@@ -590,6 +591,7 @@ class TestCmdListTasklists:
     def test_cmd_list_tasklists_GIVEN_limit_THEN_passes_to_client(
         self,
         mock_client: Mock,
+        config: Config,
         base_args: dict,
         sample_tasklists: list[dict],
     ) -> None:
@@ -597,13 +599,14 @@ class TestCmdListTasklists:
         base_args["limit"] = 5
         args = argparse.Namespace(**base_args)
 
-        cmd_list_tasklists(args, mock_client)
+        cmd_list_tasklists(args, mock_client, config)
 
         mock_client.get_tasklists.assert_called_once_with(5)
 
     def test_cmd_list_tasklists_GIVEN_show_ids_THEN_includes_ids_in_output(
         self,
         mock_client: Mock,
+        config: Config,
         base_args: dict,
         sample_tasklists: list[dict],
         capsys: CaptureFixture[str],
@@ -612,7 +615,7 @@ class TestCmdListTasklists:
         base_args["show_ids"] = True
         args = argparse.Namespace(**base_args)
 
-        cmd_list_tasklists(args, mock_client)
+        cmd_list_tasklists(args, mock_client, config)
 
         output = capsys.readouterr().out
         assert "[list1]" in output
@@ -623,61 +626,61 @@ class TestCmdConfig:
     """Test the cmd_config command handler."""
 
     def test_cmd_config_GIVEN_no_args_THEN_prints_all_settings(
-        self, config: Config, capsys: CaptureFixture[str]
+        self, mock_client: Mock, config: Config, capsys: CaptureFixture[str]
     ) -> None:
         config.set(ConfigKey.DEFAULT_TASKLIST_TITLE, "Work")
         args = argparse.Namespace(key=None, value=None)
 
-        cmd_config(args, config)
+        cmd_config(args, mock_client, config)
 
         output = capsys.readouterr().out
         assert "default_tasklist = Work" in output
 
     def test_cmd_config_GIVEN_no_args_and_unset_THEN_prints_not_set(
-        self, config: Config, capsys: CaptureFixture[str]
+        self, mock_client: Mock, config: Config, capsys: CaptureFixture[str]
     ) -> None:
         args = argparse.Namespace(key=None, value=None)
 
-        cmd_config(args, config)
+        cmd_config(args, mock_client, config)
 
         assert "(not set)" in capsys.readouterr().out
 
     def test_cmd_config_GIVEN_key_only_THEN_prints_value(
-        self, config: Config, capsys: CaptureFixture[str]
+        self, mock_client: Mock, config: Config, capsys: CaptureFixture[str]
     ) -> None:
         config.set(ConfigKey.DEFAULT_TASKLIST_TITLE, "Personal")
         args = argparse.Namespace(key="default_tasklist", value=None)
 
-        cmd_config(args, config)
+        cmd_config(args, mock_client, config)
 
         assert "default_tasklist = Personal" in capsys.readouterr().out
 
     def test_cmd_config_GIVEN_key_only_and_unset_THEN_prints_not_set(
-        self, config: Config, capsys: CaptureFixture[str]
+        self, mock_client: Mock, config: Config, capsys: CaptureFixture[str]
     ) -> None:
         args = argparse.Namespace(key="default_tasklist", value=None)
 
-        cmd_config(args, config)
+        cmd_config(args, mock_client, config)
 
         assert "(not set)" in capsys.readouterr().out
 
     def test_cmd_config_GIVEN_key_and_value_THEN_sets_and_prints(
-        self, config: Config, capsys: CaptureFixture[str]
+        self, mock_client: Mock, config: Config, capsys: CaptureFixture[str]
     ) -> None:
         args = argparse.Namespace(key="default_tasklist", value="Work")
 
-        cmd_config(args, config)
+        cmd_config(args, mock_client, config)
 
         assert config.get(ConfigKey.DEFAULT_TASKLIST_TITLE) == "Work"
         assert "default_tasklist = Work" in capsys.readouterr().out
 
     def test_cmd_config_GIVEN_invalid_key_THEN_exits(
-        self, config: Config, capsys: CaptureFixture[str]
+        self, mock_client: Mock, config: Config, capsys: CaptureFixture[str]
     ) -> None:
         args = argparse.Namespace(key="nonexistent", value=None)
 
         with pytest.raises(SystemExit) as exc:
-            cmd_config(args, config)
+            cmd_config(args, mock_client, config)
 
         assert exc.value.code == 1
         assert "Unknown key" in capsys.readouterr().out

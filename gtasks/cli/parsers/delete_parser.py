@@ -2,7 +2,6 @@
 
 import argparse
 import sys
-from functools import partial
 
 from gtasks.cli.cli_utils import prompt_choose_tasklist_id, resolve_tasks_from_inputs
 from gtasks.client.api_client import ApiClient
@@ -35,7 +34,7 @@ def cmd_delete(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None
             print(f"    {t.get('title', '?')}")
 
 
-def add_subparser_delete(subparsers, client: ApiClient, cfg: Config) -> None:
+def add_subparser_delete(subparsers) -> None:
     """Add the 'delete' subcommand to remove one or more tasks."""
     delete_parser = subparsers.add_parser(
         "delete",
@@ -55,4 +54,4 @@ def add_subparser_delete(subparsers, client: ApiClient, cfg: Config) -> None:
         default=None,
         help="Title of the task list (uses default if not specified)",
     )
-    delete_parser.set_defaults(func=partial(cmd_delete, client=client, cfg=cfg))
+    delete_parser.set_defaults(func=cmd_delete)

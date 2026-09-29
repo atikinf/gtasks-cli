@@ -2,7 +2,6 @@
 
 import argparse
 import sys
-from functools import partial
 
 import dateparser
 
@@ -56,7 +55,7 @@ def cmd_add_task(args: argparse.Namespace, client: ApiClient, cfg: Config) -> No
         print(f"Couldn't find a tasklist named {tasklist_title}")
 
 
-def add_subparser_add_task(subparsers, client: ApiClient, cfg: Config) -> None:
+def add_subparser_add_task(subparsers) -> None:
     """Add the 'add' subcommand to create a new task."""
     add_parser = subparsers.add_parser(
         "add",
@@ -89,4 +88,4 @@ def add_subparser_add_task(subparsers, client: ApiClient, cfg: Config) -> None:
         default=None,
         help="Due date (natural language e.g. 'tomorrow', 'next friday', '2026-05-01')",
     )
-    add_parser.set_defaults(func=partial(cmd_add_task, client=client, cfg=cfg))
+    add_parser.set_defaults(func=cmd_add_task)

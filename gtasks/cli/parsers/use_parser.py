@@ -1,7 +1,6 @@
 """Use subcommand - set the active task list."""
 
 import argparse
-from functools import partial
 
 from gtasks.cli import cli_utils
 from gtasks.cli.cli_utils import print_tasklists, prompt_choose_tasklist_id
@@ -31,7 +30,7 @@ def cmd_use(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
     print(f"Active task list set to: {selected_title}")
 
 
-def add_subparser_use(subparsers, client: ApiClient, cfg: Config) -> None:
+def add_subparser_use(subparsers) -> None:
     """Add the 'use' subcommand to set the active task list.
 
     Replaces set-default. Adds an optional positional name arg so
@@ -50,4 +49,4 @@ def add_subparser_use(subparsers, client: ApiClient, cfg: Config) -> None:
         default=None,
         help="Name of the task list to set as active",
     )
-    use_parser.set_defaults(func=partial(cmd_use, client=client, cfg=cfg))
+    use_parser.set_defaults(func=cmd_use)

@@ -2,8 +2,8 @@
 
 import argparse
 import sys
-from functools import partial
 
+from gtasks.client.api_client import ApiClient
 from gtasks.utils.config import Config, ConfigKey
 
 _DESCRIPTIONS: dict[ConfigKey, str] = {
@@ -13,8 +13,12 @@ _DESCRIPTIONS: dict[ConfigKey, str] = {
 _VALID_KEYS = ", ".join(k.value for k in ConfigKey)
 
 
-def cmd_config(args: argparse.Namespace, cfg: Config) -> None:
-    """Handle the 'config' command to view or set configuration defaults."""
+def cmd_config(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
+    """Handle the 'config' command to view or set configuration defaults.
+
+    Takes an unused `client` to match the uniform dispatch signature main()
+    calls args.func with; 'config' never touches the API.
+    """
     if args.key is None:
         for key in ConfigKey:
             value = cfg.get(key)
@@ -38,7 +42,7 @@ def cmd_config(args: argparse.Namespace, cfg: Config) -> None:
         print(f"{config_key.value} = {args.value}")
 
 
-def add_subparser_config(subparsers, cfg: Config) -> None:
+def add_subparser_config(subparsers) -> None:
     """Add the 'config' subcommand to view and set configuration defaults."""
     config_parser = subparsers.add_parser(
         "config",
@@ -59,4 +63,4 @@ def add_subparser_config(subparsers, cfg: Config) -> None:
         default=None,
         help="Value to assign to the key",
     )
-    config_parser.set_defaults(func=partial(cmd_config, cfg=cfg))
+    config_parser.set_defaults(func=cmd_config)
