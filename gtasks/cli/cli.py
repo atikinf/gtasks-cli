@@ -10,6 +10,7 @@ from gtasks.cli.parsers.done_parser import add_subparser_done
 from gtasks.cli.parsers.lists_parser import add_subparser_lists
 from gtasks.cli.parsers.tasks_parser import add_subparser_tasks, cmd_list_tasks
 from gtasks.cli.parsers.use_parser import add_subparser_use
+from gtasks.cli.tasklist_resolution import add_tasklist_option
 
 _DEFAULT_LIMIT = 10
 
@@ -27,10 +28,12 @@ def build_parser() -> argparse.ArgumentParser:
         description="Command-line interface for Google Tasks",
     )
 
-    # Default: bare `gtasks` shows the first 10 tasks from the default list.
+    # -l works before any subcommand too: `gtasks -l Work` or `gtasks -l Work done 1`.
+    add_tasklist_option(parser, top_level=True)
+
+    # Default: bare `gtasks` shows the first 10 tasks from the active list.
     parser.set_defaults(
         func=cmd_list_tasks,
-        tasklist_title=None,
         limit=_DEFAULT_LIMIT,
         show_ids=False,
     )

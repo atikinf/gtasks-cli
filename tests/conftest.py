@@ -1,0 +1,31 @@
+"""Isolation every test needs from the developer's own terminal and shell."""
+
+from collections.abc import Iterator
+
+import pytest
+from rich.console import Console
+
+from gtasks.cli import ui
+from gtasks.cli.tasklist_resolution import ENV_VAR
+
+
+def _plain_console(*, stderr: bool = False) -> Console:
+    # No `file=`: the console resolves sys.stdout/sys.stderr at write time, so capsys captures.
+    # Explicit no-colour so FORCE_COLOR or a real TTY (pytest -s) can't add escape codes.
+    return Console(
+        theme=ui.THEME,
+        highlight=False,
+        emoji=False,
+        width=100,
+        force_terminal=False,
+        color_system=None,
+        stderr=stderr,
+    )
+
+
+@pytest.fixture(autouse=True)
+def plain_output_and_clean_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    monkeypatch.delenv(ENV_VAR, raising=False)
+    ui.use_consoles(_plain_console(), _plain_console(stderr=True))
+    yield
+    ui.use_consoles(None, None)

@@ -33,13 +33,29 @@ and dispatches with `args.func(args, client=client, cfg=cfg)`. This is deliberat
 a command: write the module pair, then register it in `build_parser`. Bare `gtasks` is handled by
 a top-level `set_defaults` pointing at `cmd_list_tasks` with `limit=10`.
 
+**Which list a command acts on.** Every list-scoped handler calls
+`tasklist_resolution.resolve_target_tasklist`, whose precedence is: `-l/--list` flag >
+`$GTASKS_LIST` > the active list (`gtasks use`, stored by ID in config) > the account's
+`@default` list. A pre-ID `default_tasklist = <title>` config entry is migrated to the ID keys on
+first use. Register `-l` with `add_tasklist_option` — it's on the top-level parser too, so the
+subparser copies default to `argparse.SUPPRESS` to avoid clobbering `gtasks -l X done 1`.
+
 **Title→ID resolution.** Users address tasks and lists by title, never by API ID:
 
-- `ApiClient.resolve_tasklist_from_title` (case-insensitive) → `cli_utils.prompt_choose_tasklist_id`
-  disambiguates duplicate titles interactively → id.
-- `task_resolution.resolve_tasks_from_inputs` accepts either 1-based *display* indices (matching
-  the numbering `print_tasks` emits; the needsAction list is fetched lazily on the first digit) or
-  titles, and returns full task objects.
+- `ApiClient.resolve_tasklist_from_title` (case-insensitive) → `tasklist_resolution.choose_tasklist`
+  prompts only when titles collide; no match raises `CliError`.
+- `task_resolution.resolve_tasks_from_inputs` accepts titles or 1-based display numbers. Numbers
+  resolve against the last listing shown for that list (`utils/listing_state.py`, written by
+  `cmd_list_tasks`), so `done 3` hits the task the user saw even if the list changed since; rows
+  are marked consumed after `done`/`delete`. With no recorded listing it fetches the needsAction
+  list. Any unresolvable input raises before a batch is sent.
+
+**Output and errors.** All terminal output goes through `cli/ui.py` (rich, one `THEME` of semantic
+styles); handlers never `print`. User strings are wrapped in `Text`, never interpolated into rich
+markup. Handlers raise `cli/errors.py:CliError(message, hint=, exit_code=)` instead of printing
+and calling `sys.exit`; `app.main` renders it (plus `ExceptionGroup`, `HttpError`, Ctrl-C) to
+stderr. `tests/conftest.py` installs plain, uncoloured consoles (via `ui.use_consoles`) and clears
+`$GTASKS_LIST` for every test, so output assertions hold under `FORCE_COLOR`/`-s`.
 
 **Batch mutations.** `done` and `delete` accept multiple tasks and issue one
 `new_batch_http_request`; partial failures are collected and raised as an `ExceptionGroup`.
@@ -53,10 +69,11 @@ trivially mockable in tests.
 `ApiClient`'s full public surface (16 methods, grouped by resource — tasklist reads/writes, task
 reads/writes, batch/bulk task mutations — then the two `resolve_*_from_title` lookups), so new
 client code and new CLI commands can be typed against the contract without waiting on a consumer
-to exist. CLI handlers (`cmd_<name>` in `cli/parsers/`) and `task_resolution.py` currently consume
-7 of these (`get_tasklists`, `resolve_tasklist_from_title`, `resolve_task_from_title`, `get_tasks`,
-`add_task`, `complete_tasks`, `delete_tasks`); the remaining 9 close the gap with the Tasks API v1
-surface and aren't yet wired into any CLI command. Either way, they type their `client` param as
+to exist. The CLI (`cmd_<name>` handlers in `cli/parsers/`, `task_resolution.py`,
+`tasklist_resolution.py`) currently consumes 8 of these (`get_tasklists`, `get_tasklist`,
+`resolve_tasklist_from_title`, `resolve_task_from_title`, `get_tasks`, `add_task`,
+`complete_tasks`, `delete_tasks`); the remaining 8 close the gap with the Tasks API v1 surface and
+aren't yet wired into any CLI command. Either way, the CLI types its `client` params as
 `TasksClient`, imported under `TYPE_CHECKING` since it's never instantiated there — only
 `client_factory.build_client()` constructs a real `ApiClient` and is declared to return
 `TasksClient`. `ApiClient` needs no inheritance or declaration to satisfy the contract — it
@@ -68,7 +85,11 @@ keeps CLI code decoupled from the concrete implementation so a future swappable 
 
 - `config.toml` — despite the extension this is **INI**, written by `ConfigParser` via
   `utils/config.py:Config`. Settings are declared in the `ConfigKey` enum; adding a key means
-  adding an enum member plus a description in `config_parser.py:_DESCRIPTIONS`.
+  adding an enum member plus a description in `config_parser.py:_DESCRIPTIONS`. The active list
+  lives here as `active_tasklist_id` + `active_tasklist_title` (display cache, refreshed by
+  `lists`); `config` refuses to set those (`_MANAGED_BY`) — only `use` writes them.
+- `state.json` — app-managed, not configuration: the last task listing shown (see above). Located
+  beside `config.toml` via `ListingState.beside(cfg)`, so tests using a tmp config stay isolated.
 - `credentials.json` — user-supplied OAuth client secrets from Google Cloud Console.
 - `token.pickle` — pickled `Credentials`, refreshed automatically when expired.
 
@@ -80,4 +101,5 @@ keeps CLI code decoupled from the concrete implementation so a future swappable 
   `Mock()`/`MagicMock()` test doubles satisfy it with no `spec=` or subclassing.
 - ruff: line-length 100, rules `E,F,I,W`, `gtasks` as first-party for isort.
 - Tests: `test_<fn>_GIVEN_<condition>_THEN_<result>` naming, grouped in `Test*` classes, with a
-  `MagicMock` service fixture per module. There is no `conftest.py`.
+  `MagicMock` service fixture per module. `tests/conftest.py` holds only the autouse
+  output/env isolation fixture; other fixtures stay per-module.

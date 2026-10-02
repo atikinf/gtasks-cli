@@ -6,7 +6,13 @@ DEFAULT_SECTION: str = "DEFAULT"
 
 
 class ConfigKey(Enum):
-    DEFAULT_TASKLIST_TITLE = "default_tasklist"
+    ACTIVE_TASKLIST_ID = "active_tasklist_id"
+    ACTIVE_TASKLIST_TITLE = "active_tasklist_title"
+
+
+# Pre-ID versions stored the active list by title under this key. Read once and migrated
+# by tasklist_resolution; never written.
+LEGACY_DEFAULT_TASKLIST_KEY = "default_tasklist"
 
 
 class Config:
@@ -15,13 +21,17 @@ class Config:
     def __init__(
         self,
         config_path: Path,
-        parser: ConfigParser = ConfigParser(),
+        parser: ConfigParser | None = None,
     ) -> None:
         self._config_path: Path = config_path.expanduser()
-        self._parser: ConfigParser = parser
+        self._parser: ConfigParser = parser if parser is not None else ConfigParser()
 
         if self._config_path.exists():
             self._parser.read(self._config_path)
+
+    @property
+    def path(self) -> Path:
+        return self._config_path
 
     def get(self, key: ConfigKey, section: str = DEFAULT_SECTION) -> str | None:
         if section not in self._parser:
@@ -36,6 +46,20 @@ class Config:
 
     def get_all(self, section: str = DEFAULT_SECTION) -> dict[ConfigKey, str | None]:
         return {key: self.get(key, section) for key in ConfigKey}
+
+    def get_raw(self, name: str, section: str = DEFAULT_SECTION) -> str | None:
+        """Read a key that isn't (or is no longer) a ConfigKey."""
+        if section not in self._parser:
+            return None
+        return self._parser[section].get(name)
+
+    def pop_raw(self, name: str, section: str = DEFAULT_SECTION) -> str | None:
+        """Remove and return a key that isn't (or is no longer) a ConfigKey."""
+        if section not in self._parser or name not in self._parser[section]:
+            return None
+        value = self._parser[section].pop(name)
+        self._save()
+        return value
 
     def _save(self) -> None:
         """Write current config to disk."""

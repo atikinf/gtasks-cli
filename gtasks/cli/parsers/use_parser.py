@@ -3,8 +3,12 @@
 import argparse
 from typing import TYPE_CHECKING
 
-from gtasks.cli import cli_utils
-from gtasks.cli.cli_utils import print_tasklists, prompt_choose_tasklist_id
+from rich.text import Text
+
+from gtasks.cli import ui
+from gtasks.cli.cli_utils import prompt_index_choice
+from gtasks.cli.errors import Cancelled, CliError
+from gtasks.cli.tasklist_resolution import choose_tasklist, set_active_tasklist
 from gtasks.utils.config import Config, ConfigKey
 
 if TYPE_CHECKING:
@@ -15,41 +19,35 @@ def cmd_use(args: argparse.Namespace, client: "TasksClient", cfg: Config) -> Non
     """Handle the 'use' command to set the active task list."""
     if args.name is None:
         tasklists = client.get_tasklists()
-        print_tasklists(tasklists, argparse.Namespace(show_ids=False))
-        choice = cli_utils.prompt_index_choice(
-            len(tasklists), "Select an active task list", input
-        )
+        if not tasklists:
+            raise CliError("You have no task lists.")
+        ui.render_tasklists(tasklists, active_id=cfg.get(ConfigKey.ACTIVE_TASKLIST_ID))
+        choice = prompt_index_choice(len(tasklists), "Make which list active?", input)
         if choice is None:
-            return
-        selected_title = tasklists[choice].get("title", "")
+            raise Cancelled()
+        tasklist = tasklists[choice]
     else:
-        matches = client.resolve_tasklist_from_title(args.name)
-        tasklist_id = prompt_choose_tasklist_id(matches, args.name)
-        if tasklist_id is None:
-            return
-        selected_title = args.name
+        tasklist = choose_tasklist(client.resolve_tasklist_from_title(args.name), args.name)
 
-    cfg.set(ConfigKey.DEFAULT_TASKLIST_TITLE, selected_title)
-    print(f"Active task list set to: {selected_title}")
+    set_active_tasklist(cfg, tasklist)
+    ui.success(Text.assemble("Active list: ", (tasklist.get("title", ""), "heading")))
 
 
 def add_subparser_use(subparsers) -> None:
-    """Add the 'use' subcommand to set the active task list.
-
-    Replaces set-default. Adds an optional positional name arg so
-    `gtasks use "Work"` sets directly by name; omitting it falls back
-    to the interactive picker.
-    """
+    """Add the 'use' subcommand to set the active task list."""
     use_parser = subparsers.add_parser(
         "use",
         help="Set the active task list",
-        description="Set the active task list by name, or pick interactively if no name given.",
+        description=(
+            "Set the task list that commands act on when no -l/--list is given. "
+            "Pick interactively if no name is given."
+        ),
     )
     use_parser.add_argument(
         "name",
         type=str,
         nargs="?",
         default=None,
-        help="Name of the task list to set as active",
+        help="Name of the task list to make active",
     )
     use_parser.set_defaults(func=cmd_use)

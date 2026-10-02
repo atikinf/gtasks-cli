@@ -1,10 +1,11 @@
 """Auth subcommand - configure OAuth credentials."""
 
 import argparse
-import sys
 from typing import TYPE_CHECKING
 
+from gtasks.cli import ui
 from gtasks.cli.cli_utils import prompt_setup_credentials
+from gtasks.cli.errors import Cancelled
 from gtasks.client.client_factory import auth
 from gtasks.defaults import APP_CFG_PATH
 from gtasks.utils.config import Config
@@ -35,15 +36,14 @@ def cmd_auth(args: argparse.Namespace, client: "TasksClient", cfg: Config) -> No
     still takes both params to match the uniform dispatch signature main()
     calls args.func with; they're unused here.
     """
-    print(_SETUP_INSTRUCTIONS)
+    ui.info(_SETUP_INSTRUCTIONS)
     result = prompt_setup_credentials()
     if result is None:
-        print("Setup cancelled.")
-        sys.exit(1)
+        raise Cancelled()
 
     client_id, client_secret = result
     auth(TOKEN_PATH, client_id, client_secret)
-    print("Authentication successful. You're ready to use gtasks.")
+    ui.success("Authenticated. You're ready to use gtasks.")
 
 
 def add_subparser_auth(subparsers) -> None:

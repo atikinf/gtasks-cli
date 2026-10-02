@@ -1,19 +1,34 @@
 """Config subcommand - view and set configuration defaults."""
 
 import argparse
-import sys
 from typing import TYPE_CHECKING
 
-from gtasks.utils.config import Config, ConfigKey
+from rich.text import Text
+
+from gtasks.cli import ui
+from gtasks.cli.errors import CliError
+from gtasks.utils.config import LEGACY_DEFAULT_TASKLIST_KEY, Config, ConfigKey
 
 if TYPE_CHECKING:
     from gtasks.client.protocol import TasksClient
 
 _DESCRIPTIONS: dict[ConfigKey, str] = {
-    ConfigKey.DEFAULT_TASKLIST_TITLE: "The default task list used when no -l flag is given",
+    ConfigKey.ACTIVE_TASKLIST_ID: "ID of the list commands act on when no -l is given",
+    ConfigKey.ACTIVE_TASKLIST_TITLE: "Display name of the active list",
+}
+
+# Keys owned by another command; setting them by hand would let ID and title disagree.
+_MANAGED_BY: dict[ConfigKey, str] = {
+    ConfigKey.ACTIVE_TASKLIST_ID: "gtasks use",
+    ConfigKey.ACTIVE_TASKLIST_TITLE: "gtasks use",
 }
 
 _VALID_KEYS = ", ".join(k.value for k in ConfigKey)
+
+
+def _setting_line(key: ConfigKey, value: str | None) -> Text:
+    shown = (value, "") if value is not None else ("(not set)", "muted")
+    return Text.assemble((key.value, "heading"), " = ", shown)
 
 
 def cmd_config(args: argparse.Namespace, client: "TasksClient", cfg: Config) -> None:
@@ -24,25 +39,28 @@ def cmd_config(args: argparse.Namespace, client: "TasksClient", cfg: Config) -> 
     """
     if args.key is None:
         for key in ConfigKey:
-            value = cfg.get(key)
-            display = value if value is not None else "(not set)"
-            print(f"{key.value} = {display}")
-            print(f"    {_DESCRIPTIONS[key]}")
+            ui.info(_setting_line(key, cfg.get(key)))
+            ui.info(Text(f"    {_DESCRIPTIONS[key]}", style="muted"))
         return
 
+    if args.key == LEGACY_DEFAULT_TASKLIST_KEY:
+        raise CliError(
+            f"'{args.key}' was replaced by the active list.", hint="Run `gtasks use <list>`."
+        )
     try:
         config_key = ConfigKey(args.key)
     except ValueError:
-        print(f"Unknown key: {args.key!r}. Valid keys: {_VALID_KEYS}")
-        sys.exit(1)
+        raise CliError(f"Unknown key '{args.key}'.", hint=f"Valid keys: {_VALID_KEYS}") from None
 
     if args.value is None:
-        value = cfg.get(config_key)
-        display = value if value is not None else "(not set)"
-        print(f"{config_key.value} = {display}")
-    else:
-        cfg.set(config_key, args.value)
-        print(f"{config_key.value} = {args.value}")
+        ui.info(_setting_line(config_key, cfg.get(config_key)))
+        return
+
+    if config_key in _MANAGED_BY:
+        command = _MANAGED_BY[config_key]
+        raise CliError(f"'{config_key.value}' is set by `{command}`.", hint=f"Run `{command}`.")
+    cfg.set(config_key, args.value)
+    ui.success(_setting_line(config_key, args.value))
 
 
 def add_subparser_config(subparsers) -> None:

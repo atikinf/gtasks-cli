@@ -1,56 +1,42 @@
 """Tasks subcommand - list tasks from a task list."""
 
 import argparse
-import sys
 from typing import TYPE_CHECKING
 
-from gtasks.cli.cli_utils import print_tasks, prompt_choose_tasklist_id
-from gtasks.utils.config import Config, ConfigKey
+from gtasks.cli import ui
+from gtasks.cli.tasklist_resolution import add_tasklist_option, resolve_target_tasklist
+from gtasks.utils.config import Config
+from gtasks.utils.listing_state import ListingState
 
 if TYPE_CHECKING:
     from gtasks.client.protocol import TasksClient
 
 
 def cmd_list_tasks(args: argparse.Namespace, client: "TasksClient", cfg: Config) -> None:
-    """Handle the 'list' command to display tasks."""
-    tasklist_title: None | str = args.tasklist_title or cfg.get(ConfigKey.DEFAULT_TASKLIST_TITLE)
-    if tasklist_title is None:
-        print(
-            "Error: You must specify a --tasklist-title (-t) or set a default tasklist"
-        )
-        sys.exit(1)
-        return
-    tasks = []
+    """Handle the 'tasks' command (and bare `gtasks`) to display open tasks."""
+    target = resolve_target_tasklist(args, client, cfg)
 
-    matches = client.resolve_tasklist_from_title(tasklist_title)
+    # TODO: "show completed" mode — fetch needsAction tasks here, then read
+    # recently completed tasks from a local cache (populated by `gtasks done`)
+    # to append as strikethrough, avoiding a second API call. Configurable via `gtasks config`.
+    # Fetch one extra row to learn whether the limit hid anything.
+    fetch_limit = args.limit + 1 if args.limit is not None else None
+    tasks = client.get_tasks(target.id, fetch_limit, show_completed=False)
+    truncated = args.limit is not None and len(tasks) > args.limit
+    tasks = tasks[: args.limit] if truncated else tasks
 
-    id_ = prompt_choose_tasklist_id(matches, tasklist_title)
-    if id_ is not None:
-        # TODO: "show completed" mode — fetch needsAction tasks here, then read
-        # recently completed tasks from a local cache (populated by `gtasks done`)
-        # to append as strikethrough, avoiding a second API call. Configurable via `gtasks config`.
-        tasks = client.get_tasks(id_, args.limit, show_completed=False)
-    else:
-        print(f"Couldn't find a tasklist named {tasklist_title}")
-
-    print(f"==[{tasklist_title}]==")
-    print_tasks(tasks, args)
+    ui.render_tasks(tasks, heading=target.title, show_ids=args.show_ids, truncated=truncated)
+    ListingState.beside(cfg).save(target.id, tasks)
 
 
 def add_subparser_tasks(subparsers) -> None:
     """Add the 'tasks' subcommand to list tasks."""
     tasks_parser = subparsers.add_parser(
         "tasks",
-        help="List tasks from a task list",
-        description="Display tasks from the specified or default task list.",
+        help="List open tasks",
+        description="Display open tasks from the active (or given) task list.",
     )
-    tasks_parser.add_argument(
-        "-l",
-        "--tasklist-title",
-        type=str,
-        default=None,
-        help="Title of the task list to show tasks from (uses default if not specified)",
-    )
+    add_tasklist_option(tasks_parser)
     tasks_parser.add_argument(
         "-n",
         "--limit",
