@@ -1,6 +1,7 @@
 """Auth subcommand - configure OAuth credentials."""
 
 import argparse
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from gtasks.cli import ui
@@ -28,13 +29,14 @@ Enter 'q' at any prompt to cancel.
 """
 
 
-def cmd_auth(args: argparse.Namespace, client: "TasksClient", cfg: Config) -> None:
+def cmd_auth(
+    args: argparse.Namespace, get_client: "Callable[[], TasksClient]", cfg: Config
+) -> None:
     """Handle the 'auth' command to configure OAuth credentials.
 
-    Unlike every other command, 'auth' doesn't need an API client or config -
-    it exists to create the credentials those other commands depend on. It
-    still takes both params to match the uniform dispatch signature main()
-    calls args.func with; they're unused here.
+    Never calls `get_client`: building a client needs the credentials this
+    command exists to create. Both params are unused; they match the uniform
+    dispatch signature main() calls args.func with.
     """
     ui.info(_SETUP_INSTRUCTIONS)
     result = prompt_setup_credentials()

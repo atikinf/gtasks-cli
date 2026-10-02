@@ -1,6 +1,7 @@
 """Delete subcommand - delete tasks by name or display index."""
 
 import argparse
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from gtasks.cli import ui
@@ -13,8 +14,11 @@ if TYPE_CHECKING:
     from gtasks.client.protocol import TasksClient
 
 
-def cmd_delete(args: argparse.Namespace, client: "TasksClient", cfg: Config) -> None:
+def cmd_delete(
+    args: argparse.Namespace, get_client: "Callable[[], TasksClient]", cfg: Config
+) -> None:
     """Handle the 'delete' command to remove one or more tasks."""
+    client = get_client()
     target = resolve_target_tasklist(args, client, cfg)
     listing = ListingState.beside(cfg)
     tasks = resolve_tasks_from_inputs(args.tasks, client, target.id, listing)

@@ -1,6 +1,7 @@
 """Add subcommand - add a new task."""
 
 import argparse
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import dateparser
@@ -34,7 +35,9 @@ def parse_due_date(date_str: str) -> str:
     return dt.strftime("%Y-%m-%dT00:00:00.000Z")
 
 
-def cmd_add_task(args: argparse.Namespace, client: "TasksClient", cfg: Config) -> None:
+def cmd_add_task(
+    args: argparse.Namespace, get_client: "Callable[[], TasksClient]", cfg: Config
+) -> None:
     """Handle the 'add' command to create a new task."""
     # Parse the date before touching the API so a typo fails fast.
     try:
@@ -42,6 +45,7 @@ def cmd_add_task(args: argparse.Namespace, client: "TasksClient", cfg: Config) -
     except ValueError as e:
         raise CliError(str(e), hint="Try 'tomorrow', 'next friday' or '2026-05-01'.") from e
 
+    client = get_client()
     target = resolve_target_tasklist(args, client, cfg)
     task = client.add_task(
         tasklist_id=target.id,

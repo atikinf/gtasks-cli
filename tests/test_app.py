@@ -90,3 +90,39 @@ class TestMainErrorRouting:
         assert code == 1
         assert capsys.readouterr().err.startswith("error: credentials.json")
 
+
+class TestMainClientConstruction:
+    """The client (and so credentials/OAuth) is built only when a handler asks for it."""
+
+    @pytest.fixture
+    def build_client(self, tmp_path: Path) -> Iterator[Mock]:
+        with (
+            patch("gtasks.app.build_client") as build_client,
+            patch("gtasks.app.CONFIG_FILE_PATH", tmp_path / "config.toml"),
+        ):
+            yield build_client
+
+    def test_main_GIVEN_auth_on_first_run_THEN_never_builds_client(
+        self, build_client: Mock
+    ) -> None:
+        build_client.side_effect = FileNotFoundError("credentials.json")
+
+        with patch(
+            "gtasks.cli.parsers.auth_parser.prompt_setup_credentials", return_value=None
+        ):
+            code = main(["auth"])
+
+        assert code == 130  # reached auth's own prompt and the user cancelled
+        build_client.assert_not_called()
+
+    def test_main_GIVEN_config_THEN_never_builds_client(self, build_client: Mock) -> None:
+        build_client.side_effect = FileNotFoundError("credentials.json")
+
+        assert main(["config"]) == 0
+        build_client.assert_not_called()
+
+    def test_main_GIVEN_api_command_THEN_builds_client_once(self, build_client: Mock) -> None:
+        build_client.return_value.get_tasklists.return_value = []
+
+        assert main(["lists"]) == 0
+        build_client.assert_called_once_with()

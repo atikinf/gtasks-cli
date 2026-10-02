@@ -1,6 +1,7 @@
 """Use subcommand - set the active task list."""
 
 import argparse
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from rich.text import Text
@@ -15,8 +16,11 @@ if TYPE_CHECKING:
     from gtasks.client.protocol import TasksClient
 
 
-def cmd_use(args: argparse.Namespace, client: "TasksClient", cfg: Config) -> None:
+def cmd_use(
+    args: argparse.Namespace, get_client: "Callable[[], TasksClient]", cfg: Config
+) -> None:
     """Handle the 'use' command to set the active task list."""
+    client = get_client()
     if args.name is None:
         tasklists = client.get_tasklists()
         if not tasklists:

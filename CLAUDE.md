@@ -21,17 +21,20 @@ CI (`.github/workflows`) runs `ruff check .` then `pytest` on pushes/PRs to `mas
 **Parser-per-command, dependencies resolved after parsing.** Each command is a module in
 `gtasks/cli/parsers/<name>_parser.py` exposing a pair:
 
-- `cmd_<name>(args, client, cfg)` — the handler (all three params present even if a given
+- `cmd_<name>(args, get_client, cfg)` — the handler (all three params present even if a given
   handler ignores one or two of them, e.g. `cmd_auth`, `cmd_config`)
 - `add_subparser_<name>(subparsers)` — registers the argparse subparser and points
   `set_defaults(func=cmd_<name>)` at the *unbound* handler; no client/cfg at parse time
 
 `cli/cli.py:build_parser` wires every subparser and is pure structure — it never touches a client
-or config. `app.py:main` calls `parser.parse_args(argv)` first, only then builds `cfg` and `client`,
-and dispatches with `args.func(args, client=client, cfg=cfg)`. This is deliberate: it keeps
-`--help` and invalid invocations from ever loading credentials or launching the OAuth flow. To add
-a command: write the module pair, then register it in `build_parser`. Bare `gtasks` is handled by
-a top-level `set_defaults` pointing at `cmd_list_tasks` with `limit=10`.
+or config. `app.py:main` calls `parser.parse_args(argv)` first, only then builds `cfg`, and
+dispatches with `args.func(args, get_client=get_client, cfg=cfg)`. `get_client` is a cached
+callable around `client_factory.build_client`, and handlers that use the API call it on their first
+line; `auth` and `config` never do. So the client — and with it credential loading and the OAuth
+flow — is built only by commands that need it: never for `--help` or invalid invocations, and
+never for `auth` (which creates those credentials) or `config`. Tests pass `lambda: mock_client`.
+To add a command: write the module pair, then register it in `build_parser`. Bare `gtasks` is
+handled by a top-level `set_defaults` pointing at `cmd_list_tasks` with `limit=10`.
 
 **Which list a command acts on.** Every list-scoped handler calls
 `tasklist_resolution.resolve_target_tasklist`, whose precedence is: `-l/--list` flag >
@@ -73,8 +76,9 @@ to exist. The CLI (`cmd_<name>` handlers in `cli/parsers/`, `task_resolution.py`
 `tasklist_resolution.py`) currently consumes 8 of these (`get_tasklists`, `get_tasklist`,
 `resolve_tasklist_from_title`, `resolve_task_from_title`, `get_tasks`, `add_task`,
 `complete_tasks`, `delete_tasks`); the remaining 8 close the gap with the Tasks API v1 surface and
-aren't yet wired into any CLI command. Either way, the CLI types its `client` params as
-`TasksClient`, imported under `TYPE_CHECKING` since it's never instantiated there — only
+aren't yet wired into any CLI command. Either way, the CLI types its client as `TasksClient`
+(handlers via `get_client: Callable[[], TasksClient]`), imported under
+`TYPE_CHECKING` since it's never instantiated there — only
 `client_factory.build_client()` constructs a real `ApiClient` and is declared to return
 `TasksClient`. `ApiClient` needs no inheritance or declaration to satisfy the contract — it
 conforms structurally, which is also why a bare `Mock()` satisfies it in tests with no setup. This

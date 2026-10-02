@@ -2,6 +2,7 @@
 """Main entry point for the Google Tasks CLI."""
 
 import sys
+from functools import cache
 
 from googleapiclient.errors import HttpError
 
@@ -27,10 +28,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
+    # Handlers call this only if they use the API, so `auth` and `config` never load
+    # credentials. Cached so a handler that calls it more than once gets one client.
+    get_client = cache(build_client)
+
     try:
         cfg = Config(CONFIG_FILE_PATH)
-        client = build_client()
-        args.func(args, client=client, cfg=cfg)
+        args.func(args, get_client=get_client, cfg=cfg)
         return 0
     except (KeyboardInterrupt, EOFError):
         ui.error(Cancelled().message)

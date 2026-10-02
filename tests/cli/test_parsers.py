@@ -306,7 +306,7 @@ class TestCmdAddTask:
     ) -> None:
         mock_client.add_task.return_value = {"title": "Test Task"}
 
-        cmd_add_task(argparse.Namespace(**base_args), mock_client, active_config)
+        cmd_add_task(argparse.Namespace(**base_args), lambda: mock_client, active_config)
 
         mock_client.add_task.assert_called_once_with(
             tasklist_id="list1", task_title="Test Task", notes=None, due=None
@@ -321,7 +321,7 @@ class TestCmdAddTask:
         mock_client.add_task.return_value = {"title": "Test Task"}
         base_args["tasklist_title"] = "home"
 
-        cmd_add_task(argparse.Namespace(**base_args), mock_client, active_config)
+        cmd_add_task(argparse.Namespace(**base_args), lambda: mock_client, active_config)
 
         assert mock_client.add_task.call_args.kwargs["tasklist_id"] == "list2"
 
@@ -331,7 +331,7 @@ class TestCmdAddTask:
         mock_client.add_task.return_value = {"title": "Test Task"}
         base_args.update(notes="Important notes", due="2026-01-20T00:00:00Z")
 
-        cmd_add_task(argparse.Namespace(**base_args), mock_client, active_config)
+        cmd_add_task(argparse.Namespace(**base_args), lambda: mock_client, active_config)
 
         mock_client.add_task.assert_called_once_with(
             tasklist_id="list1",
@@ -346,7 +346,7 @@ class TestCmdAddTask:
         base_args["due"] = "blursday"
 
         with pytest.raises(CliError, match="Could not parse due date"):
-            cmd_add_task(argparse.Namespace(**base_args), mock_client, active_config)
+            cmd_add_task(argparse.Namespace(**base_args), lambda: mock_client, active_config)
 
         assert mock_client.mock_calls == []
 
@@ -357,7 +357,7 @@ class TestCmdAddTask:
         base_args["tasklist_title"] = "NonExistent"
 
         with pytest.raises(CliError, match="No task list named 'NonExistent'"):
-            cmd_add_task(argparse.Namespace(**base_args), mock_client, config)
+            cmd_add_task(argparse.Namespace(**base_args), lambda: mock_client, config)
 
         mock_client.add_task.assert_not_called()
 
@@ -380,7 +380,7 @@ class TestCmdListTasks:
     ) -> None:
         mock_client.get_tasks.return_value = self.SAMPLE_TASKS
 
-        cmd_list_tasks(argparse.Namespace(**base_args), mock_client, active_config)
+        cmd_list_tasks(argparse.Namespace(**base_args), lambda: mock_client, active_config)
 
         mock_client.get_tasks.assert_called_once_with("list1", None, show_completed=False)
         output = capsys.readouterr().out
@@ -394,7 +394,7 @@ class TestCmdListTasks:
         mock_client.get_tasklist.return_value = {"id": "def", "title": "My Tasks"}
         mock_client.get_tasks.return_value = []
 
-        cmd_list_tasks(argparse.Namespace(**base_args), mock_client, config)
+        cmd_list_tasks(argparse.Namespace(**base_args), lambda: mock_client, config)
 
         mock_client.get_tasks.assert_called_once_with("def", None, show_completed=False)
         assert "My Tasks · 0 open" in capsys.readouterr().out
@@ -405,7 +405,7 @@ class TestCmdListTasks:
         mock_client.get_tasks.return_value = self.SAMPLE_TASKS
         base_args["limit"] = 2
 
-        cmd_list_tasks(argparse.Namespace(**base_args), mock_client, active_config)
+        cmd_list_tasks(argparse.Namespace(**base_args), lambda: mock_client, active_config)
 
         mock_client.get_tasks.assert_called_once_with("list1", 3, show_completed=False)
         output = capsys.readouterr().out
@@ -418,7 +418,7 @@ class TestCmdListTasks:
         mock_client.get_tasks.return_value = self.SAMPLE_TASKS
         base_args["show_ids"] = True
 
-        cmd_list_tasks(argparse.Namespace(**base_args), mock_client, active_config)
+        cmd_list_tasks(argparse.Namespace(**base_args), lambda: mock_client, active_config)
 
         output = capsys.readouterr().out
         assert "t1" in output
@@ -429,7 +429,7 @@ class TestCmdListTasks:
     ) -> None:
         mock_client.get_tasks.return_value = self.SAMPLE_TASKS[:2]
 
-        cmd_list_tasks(argparse.Namespace(**base_args), mock_client, active_config)
+        cmd_list_tasks(argparse.Namespace(**base_args), lambda: mock_client, active_config)
 
         assert ListingState.beside(active_config).rows("list1") == [
             {"id": "t1", "title": "Task 1"},
@@ -443,7 +443,7 @@ class TestCmdListTasks:
         base_args["tasklist_title"] = "NonExistent"
 
         with pytest.raises(CliError):
-            cmd_list_tasks(argparse.Namespace(**base_args), mock_client, config)
+            cmd_list_tasks(argparse.Namespace(**base_args), lambda: mock_client, config)
 
         mock_client.get_tasks.assert_not_called()
 
@@ -462,7 +462,7 @@ class TestCmdListTasklists:
     ) -> None:
         mock_client.get_tasklists.return_value = self.SAMPLE_TASKLISTS
 
-        cmd_list_tasklists(argparse.Namespace(**base_args), mock_client, config)
+        cmd_list_tasklists(argparse.Namespace(**base_args), lambda: mock_client, config)
 
         mock_client.get_tasklists.assert_called_once_with(None)
         output = capsys.readouterr().out
@@ -475,7 +475,7 @@ class TestCmdListTasklists:
         mock_client.get_tasklists.return_value = self.SAMPLE_TASKLISTS
         base_args["limit"] = 5
 
-        cmd_list_tasklists(argparse.Namespace(**base_args), mock_client, config)
+        cmd_list_tasklists(argparse.Namespace(**base_args), lambda: mock_client, config)
 
         mock_client.get_tasklists.assert_called_once_with(5)
 
@@ -484,7 +484,7 @@ class TestCmdListTasklists:
     ) -> None:
         mock_client.get_tasklists.return_value = self.SAMPLE_TASKLISTS
 
-        cmd_list_tasklists(argparse.Namespace(**base_args), mock_client, active_config)
+        cmd_list_tasklists(argparse.Namespace(**base_args), lambda: mock_client, active_config)
 
         assert "● Work" in capsys.readouterr().out
 
@@ -493,7 +493,7 @@ class TestCmdListTasklists:
     ) -> None:
         mock_client.get_tasklists.return_value = [{"id": "list1", "title": "Job"}]
 
-        cmd_list_tasklists(argparse.Namespace(**base_args), mock_client, active_config)
+        cmd_list_tasklists(argparse.Namespace(**base_args), lambda: mock_client, active_config)
 
         assert active_config.get(ConfigKey.ACTIVE_TASKLIST_TITLE) == "Job"
 
@@ -503,7 +503,7 @@ class TestCmdListTasklists:
         mock_client.get_tasklists.return_value = self.SAMPLE_TASKLISTS
         base_args["show_ids"] = True
 
-        cmd_list_tasklists(argparse.Namespace(**base_args), mock_client, config)
+        cmd_list_tasklists(argparse.Namespace(**base_args), lambda: mock_client, config)
 
         output = capsys.readouterr().out
         assert "list1" in output
@@ -518,7 +518,7 @@ class TestCmdUse:
     ) -> None:
         mock_client.resolve_tasklist_from_title.return_value = [ACTIVE]
 
-        cmd_use(argparse.Namespace(name="work"), mock_client, config)
+        cmd_use(argparse.Namespace(name="work"), lambda: mock_client, config)
 
         assert config.get(ConfigKey.ACTIVE_TASKLIST_ID) == "list1"
         assert config.get(ConfigKey.ACTIVE_TASKLIST_TITLE) == "Work"
@@ -530,7 +530,7 @@ class TestCmdUse:
         mock_client.resolve_tasklist_from_title.return_value = []
 
         with pytest.raises(CliError):
-            cmd_use(argparse.Namespace(name="Nope"), mock_client, active_config)
+            cmd_use(argparse.Namespace(name="Nope"), lambda: mock_client, active_config)
 
         assert active_config.get(ConfigKey.ACTIVE_TASKLIST_ID) == "list1"
 
@@ -540,7 +540,7 @@ class TestCmdUse:
         mock_client.get_tasklists.return_value = [ACTIVE, {"id": "list2", "title": "Home"}]
 
         with patch("builtins.input", return_value="2"):
-            cmd_use(argparse.Namespace(name=None), mock_client, config)
+            cmd_use(argparse.Namespace(name=None), lambda: mock_client, config)
 
         assert config.get(ConfigKey.ACTIVE_TASKLIST_ID) == "list2"
 
@@ -550,7 +550,7 @@ class TestCmdUse:
         mock_client.get_tasklists.return_value = [ACTIVE, {"id": "list2", "title": "Home"}]
 
         with patch("builtins.input", return_value="q"), pytest.raises(Cancelled):
-            cmd_use(argparse.Namespace(name=None), mock_client, config)
+            cmd_use(argparse.Namespace(name=None), lambda: mock_client, config)
 
         assert config.get(ConfigKey.ACTIVE_TASKLIST_ID) is None
 
@@ -561,7 +561,7 @@ class TestCmdConfig:
     def test_cmd_config_GIVEN_no_args_THEN_prints_all_settings(
         self, mock_client: Mock, active_config: Config, capsys: CaptureFixture
     ) -> None:
-        cmd_config(argparse.Namespace(key=None, value=None), mock_client, active_config)
+        cmd_config(argparse.Namespace(key=None, value=None), lambda: mock_client, active_config)
 
         output = capsys.readouterr().out
         assert "active_tasklist_id = list1" in output
@@ -570,7 +570,7 @@ class TestCmdConfig:
     def test_cmd_config_GIVEN_no_args_and_unset_THEN_prints_not_set(
         self, mock_client: Mock, config: Config, capsys: CaptureFixture
     ) -> None:
-        cmd_config(argparse.Namespace(key=None, value=None), mock_client, config)
+        cmd_config(argparse.Namespace(key=None, value=None), lambda: mock_client, config)
 
         assert "(not set)" in capsys.readouterr().out
 
@@ -579,7 +579,7 @@ class TestCmdConfig:
     ) -> None:
         args = argparse.Namespace(key="active_tasklist_title", value=None)
 
-        cmd_config(args, mock_client, active_config)
+        cmd_config(args, lambda: mock_client, active_config)
 
         assert "active_tasklist_title = Work" in capsys.readouterr().out
 
@@ -589,7 +589,7 @@ class TestCmdConfig:
         args = argparse.Namespace(key="active_tasklist_title", value="Other")
 
         with pytest.raises(CliError, match="gtasks use") as exc:
-            cmd_config(args, mock_client, active_config)
+            cmd_config(args, lambda: mock_client, active_config)
 
         assert exc.value.hint == "Run `gtasks use`."
         assert active_config.get(ConfigKey.ACTIVE_TASKLIST_TITLE) == "Work"
@@ -600,7 +600,7 @@ class TestCmdConfig:
         args = argparse.Namespace(key="default_tasklist", value="Work")
 
         with pytest.raises(CliError, match="replaced by the active list") as exc:
-            cmd_config(args, mock_client, config)
+            cmd_config(args, lambda: mock_client, config)
 
         assert exc.value.hint == "Run `gtasks use <list>`."
 
@@ -608,7 +608,8 @@ class TestCmdConfig:
         self, mock_client: Mock, config: Config
     ) -> None:
         with pytest.raises(CliError, match="Unknown key"):
-            cmd_config(argparse.Namespace(key="nonexistent", value=None), mock_client, config)
+            args = argparse.Namespace(key="nonexistent", value=None)
+            cmd_config(args, lambda: mock_client, config)
 
 
 class TestCmdDone:
@@ -627,7 +628,7 @@ class TestCmdDone:
             {"id": "task1", "title": "Buy milk", "status": "completed"}
         ]
 
-        cmd_done(argparse.Namespace(tasks=["Buy milk"]), mock_client, active_config)
+        cmd_done(argparse.Namespace(tasks=["Buy milk"]), lambda: mock_client, active_config)
 
         mock_client.complete_tasks.assert_called_once_with("list1", ["task1"])
         assert "✓ Completed Buy milk · Work" in capsys.readouterr().out
@@ -641,7 +642,7 @@ class TestCmdDone:
             {"id": "task2", "title": "Walk dog", "status": "completed"},
         ]
 
-        cmd_done(argparse.Namespace(tasks=["1", "2"]), mock_client, active_config)
+        cmd_done(argparse.Namespace(tasks=["1", "2"]), lambda: mock_client, active_config)
 
         mock_client.complete_tasks.assert_called_once_with("list1", ["task1", "task2"])
         output = capsys.readouterr().out
@@ -657,7 +658,7 @@ class TestCmdDone:
         mock_client.get_tasks.return_value = [{"id": "new", "title": "Surprise"}]
         mock_client.complete_tasks.return_value = [{"id": "task1", "title": "Buy milk"}]
 
-        cmd_done(argparse.Namespace(tasks=["1"]), mock_client, active_config)
+        cmd_done(argparse.Namespace(tasks=["1"]), lambda: mock_client, active_config)
 
         mock_client.complete_tasks.assert_called_once_with("list1", ["task1"])
         mock_client.get_tasks.assert_not_called()
@@ -667,10 +668,10 @@ class TestCmdDone:
     ) -> None:
         ListingState.beside(active_config).save("list1", self.SAMPLE_TASKS)
         mock_client.complete_tasks.return_value = [{"id": "task1", "title": "Buy milk"}]
-        cmd_done(argparse.Namespace(tasks=["1"]), mock_client, active_config)
+        cmd_done(argparse.Namespace(tasks=["1"]), lambda: mock_client, active_config)
 
         with pytest.raises(CliError, match="already completed"):
-            cmd_done(argparse.Namespace(tasks=["1"]), mock_client, active_config)
+            cmd_done(argparse.Namespace(tasks=["1"]), lambda: mock_client, active_config)
 
         mock_client.complete_tasks.assert_called_once()
 
@@ -688,7 +689,7 @@ class TestCmdDelete:
     ) -> None:
         mock_client.resolve_task_from_title.return_value = [self.SAMPLE_TASKS[0]]
 
-        cmd_delete(argparse.Namespace(tasks=["Buy milk"]), mock_client, active_config)
+        cmd_delete(argparse.Namespace(tasks=["Buy milk"]), lambda: mock_client, active_config)
 
         mock_client.delete_tasks.assert_called_once_with("list1", ["task1"])
         assert "✓ Deleted Buy milk · Work" in capsys.readouterr().out
@@ -698,7 +699,7 @@ class TestCmdDelete:
     ) -> None:
         mock_client.get_tasks.return_value = self.SAMPLE_TASKS
 
-        cmd_delete(argparse.Namespace(tasks=["1", "2"]), mock_client, active_config)
+        cmd_delete(argparse.Namespace(tasks=["1", "2"]), lambda: mock_client, active_config)
 
         mock_client.delete_tasks.assert_called_once_with("list1", ["task1", "task2"])
         output = capsys.readouterr().out
@@ -712,6 +713,6 @@ class TestCmdDelete:
         ListingState.beside(active_config).save("list1", self.SAMPLE_TASKS)
 
         with pytest.raises(CliError):
-            cmd_delete(argparse.Namespace(tasks=["1", "9"]), mock_client, active_config)
+            cmd_delete(argparse.Namespace(tasks=["1", "9"]), lambda: mock_client, active_config)
 
         mock_client.delete_tasks.assert_not_called()

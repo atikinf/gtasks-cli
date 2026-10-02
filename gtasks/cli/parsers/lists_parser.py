@@ -1,6 +1,7 @@
 """Lists subcommand - list all task lists."""
 
 import argparse
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from gtasks.cli import ui
@@ -10,8 +11,11 @@ if TYPE_CHECKING:
     from gtasks.client.protocol import TasksClient
 
 
-def cmd_list_tasklists(args: argparse.Namespace, client: "TasksClient", cfg: Config) -> None:
+def cmd_list_tasklists(
+    args: argparse.Namespace, get_client: "Callable[[], TasksClient]", cfg: Config
+) -> None:
     """Handle the 'lists' command to display task lists, marking the active one."""
+    client = get_client()
     tasklists = client.get_tasklists(args.limit)
     active_id = cfg.get(ConfigKey.ACTIVE_TASKLIST_ID)
 

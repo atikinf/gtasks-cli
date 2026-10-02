@@ -1,6 +1,7 @@
 """Config subcommand - view and set configuration defaults."""
 
 import argparse
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from rich.text import Text
@@ -31,11 +32,13 @@ def _setting_line(key: ConfigKey, value: str | None) -> Text:
     return Text.assemble((key.value, "heading"), " = ", shown)
 
 
-def cmd_config(args: argparse.Namespace, client: "TasksClient", cfg: Config) -> None:
+def cmd_config(
+    args: argparse.Namespace, get_client: "Callable[[], TasksClient]", cfg: Config
+) -> None:
     """Handle the 'config' command to view or set configuration defaults.
 
-    Takes an unused `client` to match the uniform dispatch signature main()
-    calls args.func with; 'config' never touches the API.
+    Never calls `get_client` - 'config' doesn't touch the API, so it works
+    before `gtasks auth` has run. The param matches the uniform dispatch signature.
     """
     if args.key is None:
         for key in ConfigKey:

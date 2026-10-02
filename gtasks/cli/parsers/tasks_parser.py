@@ -1,6 +1,7 @@
 """Tasks subcommand - list tasks from a task list."""
 
 import argparse
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from gtasks.cli import ui
@@ -12,8 +13,11 @@ if TYPE_CHECKING:
     from gtasks.client.protocol import TasksClient
 
 
-def cmd_list_tasks(args: argparse.Namespace, client: "TasksClient", cfg: Config) -> None:
+def cmd_list_tasks(
+    args: argparse.Namespace, get_client: "Callable[[], TasksClient]", cfg: Config
+) -> None:
     """Handle the 'tasks' command (and bare `gtasks`) to display open tasks."""
+    client = get_client()
     target = resolve_target_tasklist(args, client, cfg)
 
     # TODO: "show completed" mode — fetch needsAction tasks here, then read
