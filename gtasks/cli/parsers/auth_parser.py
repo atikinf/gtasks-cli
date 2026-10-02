@@ -2,12 +2,15 @@
 
 import argparse
 import sys
+from typing import TYPE_CHECKING
 
 from gtasks.cli.cli_utils import prompt_setup_credentials
-from gtasks.client.api_client import ApiClient
 from gtasks.client.client_factory import auth
 from gtasks.defaults import APP_CFG_PATH
 from gtasks.utils.config import Config
+
+if TYPE_CHECKING:
+    from gtasks.client.protocol import TasksClient
 
 TOKEN_PATH = APP_CFG_PATH / "token.pickle"
 
@@ -24,7 +27,7 @@ Enter 'q' at any prompt to cancel.
 """
 
 
-def cmd_auth(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
+def cmd_auth(args: argparse.Namespace, client: "TasksClient", cfg: Config) -> None:
     """Handle the 'auth' command to configure OAuth credentials.
 
     Unlike every other command, 'auth' doesn't need an API client or config -
@@ -47,7 +50,7 @@ def add_subparser_auth(subparsers) -> None:
     """Add the 'auth' subcommand to configure OAuth credentials."""
     auth_parser = subparsers.add_parser(
         "auth",
-        help="Configure Google OAuth credentials",
+        help="Setup Google OAuth credentials",
         description="Interactively enter your Google OAuth client ID and secret to authenticate.",
     )
     auth_parser.set_defaults(func=cmd_auth)

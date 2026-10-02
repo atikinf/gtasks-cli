@@ -2,13 +2,16 @@
 
 import argparse
 import sys
+from typing import TYPE_CHECKING
 
 from gtasks.cli.cli_utils import print_tasks, prompt_choose_tasklist_id
-from gtasks.client.api_client import ApiClient
 from gtasks.utils.config import Config, ConfigKey
 
+if TYPE_CHECKING:
+    from gtasks.client.protocol import TasksClient
 
-def cmd_list_tasks(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
+
+def cmd_list_tasks(args: argparse.Namespace, client: "TasksClient", cfg: Config) -> None:
     """Handle the 'list' command to display tasks."""
     tasklist_title: None | str = args.tasklist_title or cfg.get(ConfigKey.DEFAULT_TASKLIST_TITLE)
     if tasklist_title is None:

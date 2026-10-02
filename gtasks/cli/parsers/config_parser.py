@@ -2,9 +2,12 @@
 
 import argparse
 import sys
+from typing import TYPE_CHECKING
 
-from gtasks.client.api_client import ApiClient
 from gtasks.utils.config import Config, ConfigKey
+
+if TYPE_CHECKING:
+    from gtasks.client.protocol import TasksClient
 
 _DESCRIPTIONS: dict[ConfigKey, str] = {
     ConfigKey.DEFAULT_TASKLIST_TITLE: "The default task list used when no -l flag is given",
@@ -13,7 +16,7 @@ _DESCRIPTIONS: dict[ConfigKey, str] = {
 _VALID_KEYS = ", ".join(k.value for k in ConfigKey)
 
 
-def cmd_config(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
+def cmd_config(args: argparse.Namespace, client: "TasksClient", cfg: Config) -> None:
     """Handle the 'config' command to view or set configuration defaults.
 
     Takes an unused `client` to match the uniform dispatch signature main()
@@ -46,7 +49,7 @@ def add_subparser_config(subparsers) -> None:
     """Add the 'config' subcommand to view and set configuration defaults."""
     config_parser = subparsers.add_parser(
         "config",
-        help="View or set configuration defaults",
+        help="View or set config defaults",
         description="View all settings or get/set a specific configuration value.",
     )
     config_parser.add_argument(

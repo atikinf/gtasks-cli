@@ -1,14 +1,17 @@
 """Use subcommand - set the active task list."""
 
 import argparse
+from typing import TYPE_CHECKING
 
 from gtasks.cli import cli_utils
 from gtasks.cli.cli_utils import print_tasklists, prompt_choose_tasklist_id
-from gtasks.client.api_client import ApiClient
 from gtasks.utils.config import Config, ConfigKey
 
+if TYPE_CHECKING:
+    from gtasks.client.protocol import TasksClient
 
-def cmd_use(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
+
+def cmd_use(args: argparse.Namespace, client: "TasksClient", cfg: Config) -> None:
     """Handle the 'use' command to set the active task list."""
     if args.name is None:
         tasklists = client.get_tasklists()

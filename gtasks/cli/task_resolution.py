@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from gtasks.cli.cli_utils import print_tasks, prompt_index_choice
 
 if TYPE_CHECKING:
-    from gtasks.client.api_client import ApiClient
+    from gtasks.client.protocol import TasksClient
 
 
 def prompt_choose_task_id(ids: list[str], tasks: list, task_title: str) -> None | str:
@@ -30,7 +30,7 @@ def prompt_choose_task_id(ids: list[str], tasks: list, task_title: str) -> None 
 
 def resolve_tasks_from_inputs(
     inputs: list[str],
-    client: "ApiClient",
+    client: "TasksClient",
     tasklist_id: str,
 ) -> list:
     """Resolve user inputs (1-based indices or title strings) to full task objects.

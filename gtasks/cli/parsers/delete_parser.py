@@ -2,14 +2,17 @@
 
 import argparse
 import sys
+from typing import TYPE_CHECKING
 
 from gtasks.cli.cli_utils import prompt_choose_tasklist_id
 from gtasks.cli.task_resolution import resolve_tasks_from_inputs
-from gtasks.client.api_client import ApiClient
 from gtasks.utils.config import Config, ConfigKey
 
+if TYPE_CHECKING:
+    from gtasks.client.protocol import TasksClient
 
-def cmd_delete(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
+
+def cmd_delete(args: argparse.Namespace, client: "TasksClient", cfg: Config) -> None:
     """Handle the 'delete' command to remove one or more tasks."""
     tasklist_title: None | str = args.tasklist_title or cfg.get(ConfigKey.DEFAULT_TASKLIST_TITLE)
     if tasklist_title is None:

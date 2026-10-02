@@ -15,9 +15,15 @@ Since you need to authenticate with your own API credentials, run `uv run gtasks
 * **High Prio:** Add better doc explaining how to download/configure a `credentials.json` for new users. À la [gcalcli](https://github.com/insanum/gcalcli/blob/HEAD/docs/api-auth.md).
 * Verify `gtasks auth` end-to-end functionality.
 * Add undo functionality, store recent history on disk for undo purposes.
+* Add task editing — no way to fix a title/notes/due date typo today without deleting and recreating the task.
+* Add tasklist management (`gtasks add-list`, delete a list) — lists can currently only be created/removed from the Google Tasks web UI/app; this CLI only manages tasks within existing lists.
+* Add `gtasks undone` to reopen a task marked complete by mistake (narrower than the general undo above).
 
 *Stretch Goals*:
 * "Show completed" mode — fetch needsAction tasks, then read recently-completed tasks from a local cache (populated by `gtasks done`) to append as strikethrough. Avoids a second API call. Configurable via `gtasks config`.
 * Tab-autocomplete for task list names
 * Pretty formatting
 * Benchmark startup latency — profile lazy-importing `dateparser`, `googleapiclient.discovery`, and `google_auth_oauthlib.flow`.
+* Bulk "clear completed tasks" for a list (wraps the Tasks API's `tasks.clear`).
+* Subtask support (the Tasks API's `parent` field on a task).
+* Move/reorder tasks, including moving a task to a different list (`tasks.move`).

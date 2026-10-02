@@ -1,13 +1,16 @@
 """Lists subcommand - list all task lists."""
 
 import argparse
+from typing import TYPE_CHECKING
 
 from gtasks.cli.cli_utils import print_tasklists
-from gtasks.client.api_client import ApiClient
 from gtasks.utils.config import Config
 
+if TYPE_CHECKING:
+    from gtasks.client.protocol import TasksClient
 
-def cmd_list_tasklists(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
+
+def cmd_list_tasklists(args: argparse.Namespace, client: "TasksClient", cfg: Config) -> None:
     """Handle the 'lists' command to display task lists.
 
     Takes an unused `cfg` to match the uniform dispatch signature main()

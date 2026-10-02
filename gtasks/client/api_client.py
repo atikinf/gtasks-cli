@@ -28,10 +28,10 @@ class ApiClient:
             if tl.get("title", "").lower() == tasklist_title.lower() and tl.get("id") is not None
         ]
 
-    def resolve_task_from_title(self, title: str, tasklist_id: str) -> list["Task"]:
+    def resolve_task_from_title(self, task_title: str, tasklist_id: str) -> list["Task"]:
         return [
             t for t in self.get_tasks(tasklist_id)
-            if t.get("title", "").lower() == title.lower() and t.get("id") is not None
+            if t.get("title", "").lower() == task_title.lower() and t.get("id") is not None
         ]
 
     def get_tasks(
@@ -53,11 +53,11 @@ class ApiClient:
     def add_task(
         self,
         tasklist_id: str,
-        title: str,
+        task_title: str,
         notes: str | None = None,
         due: str | None = None,
     ) -> Task:
-        task_body: Task = {"title": title}
+        task_body: Task = {"title": task_title}
         if notes is not None:
             task_body["notes"] = notes
         if due is not None:

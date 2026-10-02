@@ -2,12 +2,15 @@
 
 import argparse
 import sys
+from typing import TYPE_CHECKING
 
 import dateparser
 
 from gtasks.cli.cli_utils import prompt_choose_tasklist_id
-from gtasks.client.api_client import ApiClient
 from gtasks.utils.config import Config, ConfigKey
+
+if TYPE_CHECKING:
+    from gtasks.client.protocol import TasksClient
 
 
 def parse_due_date(date_str: str) -> str:
@@ -30,7 +33,7 @@ def parse_due_date(date_str: str) -> str:
     return dt.strftime("%Y-%m-%dT00:00:00.000Z")
 
 
-def cmd_add_task(args: argparse.Namespace, client: ApiClient, cfg: Config) -> None:
+def cmd_add_task(args: argparse.Namespace, client: "TasksClient", cfg: Config) -> None:
     """Handle the 'add' command to create a new task."""
     tasklist_title: None | str = args.tasklist_title or cfg.get(ConfigKey.DEFAULT_TASKLIST_TITLE)
     if tasklist_title is None:
@@ -46,7 +49,7 @@ def cmd_add_task(args: argparse.Namespace, client: ApiClient, cfg: Config) -> No
     if tasklist_id is not None:
         task = client.add_task(
             tasklist_id=tasklist_id,
-            title=args.title,
+            task_title=args.title,
             notes=args.notes,
             due=parse_due_date(args.due) if args.due else None,
         )

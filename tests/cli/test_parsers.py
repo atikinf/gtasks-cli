@@ -319,7 +319,7 @@ class TestCmdAddTask:
 
         mock_client.add_task.assert_called_once_with(
             tasklist_id="list1",
-            title="Test Task",
+            task_title="Test Task",
             notes=None,
             due=None,
         )
@@ -382,7 +382,7 @@ class TestCmdAddTask:
             cmd_add_task(args, mock_client, config)
         mock_client.add_task.assert_called_once_with(
             tasklist_id="list1",
-            title="Test Task",
+            task_title="Test Task",
             notes="Important notes",
             due="2026-01-20T00:00:00.000Z",
         )

@@ -11,6 +11,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
 from gtasks.client.api_client import ApiClient
+from gtasks.client.protocol import TasksClient
 from gtasks.defaults import APP_CFG_PATH
 
 if TYPE_CHECKING:
@@ -29,7 +30,7 @@ def build_tasks_resource(
     return build("tasks", "v1", credentials=creds)
 
 
-def build_client() -> ApiClient:
+def build_client() -> TasksClient:
     return ApiClient(build_tasks_resource())
 
 
