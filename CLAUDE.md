@@ -49,10 +49,14 @@ handles pagination in `_pagination_loop`) → `client/client_factory.py` (OAuth,
 `TasksResource`). `ApiClient` is constructed from a `TasksResource`, which is what makes it
 trivially mockable in tests.
 
-**Contract layer.** `client/protocol.py` defines `TasksClient`, a structural `Protocol` covering
-the 7 methods used outside `client/` (`get_tasklists`, `resolve_tasklist_from_title`,
-`resolve_task_from_title`, `get_tasks`, `add_task`, `complete_tasks`, `delete_tasks`). CLI handlers
-(`cmd_<name>` in `cli/parsers/`) and `task_resolution.py` type their `client` param as
+**Contract layer.** `client/protocol.py` defines `TasksClient`, a structural `Protocol` mirroring
+`ApiClient`'s full public surface (16 methods, grouped by resource — tasklist reads/writes, task
+reads/writes, batch/bulk task mutations — then the two `resolve_*_from_title` lookups), so new
+client code and new CLI commands can be typed against the contract without waiting on a consumer
+to exist. CLI handlers (`cmd_<name>` in `cli/parsers/`) and `task_resolution.py` currently consume
+7 of these (`get_tasklists`, `resolve_tasklist_from_title`, `resolve_task_from_title`, `get_tasks`,
+`add_task`, `complete_tasks`, `delete_tasks`); the remaining 9 close the gap with the Tasks API v1
+surface and aren't yet wired into any CLI command. Either way, they type their `client` param as
 `TasksClient`, imported under `TYPE_CHECKING` since it's never instantiated there — only
 `client_factory.build_client()` constructs a real `ApiClient` and is declared to return
 `TasksClient`. `ApiClient` needs no inheritance or declaration to satisfy the contract — it
