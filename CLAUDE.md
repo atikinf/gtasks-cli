@@ -57,7 +57,13 @@ subparser copies default to `argparse.SUPPRESS` to avoid clobbering `gtasks -l X
 styles); handlers never `print`. User strings are wrapped in `Text`, never interpolated into rich
 markup. Handlers raise `cli/errors.py:CliError(message, hint=, exit_code=)` instead of printing
 and calling `sys.exit`; `app.main` renders it (plus `ExceptionGroup`, `HttpError`, Ctrl-C) to
-stderr. `tests/conftest.py` installs plain, uncoloured consoles (via `ui.use_consoles`) and clears
+stderr. Errors bubble up untouched and are mapped to messages only there. Signed-out states all
+end in a `gtasks auth` hint via `_report_signed_out`: `SignInRequiredError` (raised by
+`client_factory` when there's no usable token and no `credentials.json`), a mid-request
+`RefreshError`, and HTTP 401. The client layer raises its own exception and never imports from
+`cli/`. A failed token refresh falls back to a fresh sign-in, so `gtasks auth` can always
+replace a revoked token.
+`tests/conftest.py` installs plain, uncoloured consoles (via `ui.use_consoles`) and clears
 `$GTASKS_LIST` for every test, so output assertions hold under `FORCE_COLOR`/`-s`.
 
 **Batch mutations.** `done` and `delete` accept multiple tasks and issue one

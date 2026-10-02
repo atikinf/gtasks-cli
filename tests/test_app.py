@@ -3,12 +3,14 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
+from google.auth.exceptions import RefreshError
 from googleapiclient.errors import HttpError
 from httplib2 import Response
 from pytest import CaptureFixture
 
 from gtasks.app import main
 from gtasks.cli.errors import CliError
+from gtasks.client.client_factory import SignInRequiredError
 
 
 def _http_error(status: int) -> HttpError:
@@ -126,3 +128,49 @@ class TestMainClientConstruction:
 
         assert main(["lists"]) == 0
         build_client.assert_called_once_with()
+
+
+class TestMainSignInHint:
+    """Every way of being signed out ends in the same pointer to `gtasks auth`."""
+
+    @pytest.fixture
+    def build_client(self, tmp_path: Path) -> Iterator[Mock]:
+        with (
+            patch("gtasks.app.build_client") as build_client,
+            patch("gtasks.app.CONFIG_FILE_PATH", tmp_path / "config.toml"),
+        ):
+            yield build_client
+
+    @pytest.mark.parametrize(
+        "argv",
+        [[], ["tasks"], ["lists"], ["add", "Milk"], ["done", "1"], ["delete", "1"], ["use", "W"]],
+        ids=["bare", "tasks", "lists", "add", "done", "delete", "use"],
+    )
+    def test_main_GIVEN_never_signed_in_THEN_every_api_command_hints_auth(
+        self, build_client: Mock, argv: list[str], capsys: CaptureFixture[str]
+    ) -> None:
+        build_client.side_effect = SignInRequiredError("no token, no credentials.json")
+
+        code = main(argv)
+
+        assert code == 1
+        assert capsys.readouterr().err.splitlines() == [
+            "error: You're not signed in to Google Tasks.",
+            "hint: Run `gtasks auth` to sign in.",
+        ]
+
+    def test_main_GIVEN_refresh_fails_mid_request_THEN_hints_auth(
+        self, build_client: Mock, capsys: CaptureFixture[str]
+    ) -> None:
+        build_client.return_value.get_tasklists.side_effect = RefreshError("invalid_grant")
+
+        assert main(["lists"]) == 1
+        assert "gtasks auth" in capsys.readouterr().err
+
+    def test_main_GIVEN_401_THEN_hints_auth(
+        self, build_client: Mock, capsys: CaptureFixture[str]
+    ) -> None:
+        build_client.return_value.get_tasklists.side_effect = _http_error(401)
+
+        assert main(["lists"]) == 1
+        assert "gtasks auth" in capsys.readouterr().err

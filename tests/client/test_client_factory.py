@@ -2,8 +2,9 @@ from pathlib import Path
 from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
+from google.auth.exceptions import RefreshError
 
-from gtasks.client.client_factory import auth_from_file
+from gtasks.client.client_factory import SignInRequiredError, auth_from_file
 
 
 class TestLoadCredentials:
@@ -170,3 +171,73 @@ class TestLoadCredentials:
         # Verify pickle.dump was called with the creds and the file handle
         mock_pickle.dump.assert_called_once()
         assert mock_pickle.dump.call_args[0][0] == expired_creds_with_refresh_token
+
+
+class TestSignInRequired:
+    @pytest.fixture
+    def token_path(self) -> Path:
+        return Path("/fake/token.pickle")
+
+    @pytest.fixture
+    def creds_path(self) -> Path:
+        return Path("/fake/credentials.json")
+
+    @patch("gtasks.client.client_factory.InstalledAppFlow")
+    def test_auth_from_file_GIVEN_no_token_and_no_credentials_file_THEN_raises_sign_in_required(
+        self, mock_flow_class: MagicMock, token_path: Path, creds_path: Path
+    ) -> None:
+        mock_flow_class.from_client_secrets_file.side_effect = FileNotFoundError(str(creds_path))
+
+        with (
+            patch.object(Path, "exists", return_value=False),
+            pytest.raises(SignInRequiredError),
+        ):
+            auth_from_file(token_path, creds_path)
+
+    @patch("gtasks.client.client_factory.InstalledAppFlow")
+    @patch("gtasks.client.client_factory.pickle")
+    def test_auth_from_file_GIVEN_refresh_fails_THEN_signs_in_again(
+        self,
+        mock_pickle: MagicMock,
+        mock_flow_class: MagicMock,
+        token_path: Path,
+        creds_path: Path,
+    ) -> None:
+        dead_creds = MagicMock(valid=False, expired=True, refresh_token="revoked")
+        dead_creds.refresh.side_effect = RefreshError("invalid_grant")
+        mock_pickle.load.return_value = dead_creds
+        new_creds = MagicMock()
+        mock_flow_class.from_client_secrets_file.return_value.run_local_server.return_value = (
+            new_creds
+        )
+
+        with (
+            patch.object(Path, "exists", return_value=True),
+            patch.object(Path, "open", mock_open()),
+            patch.object(Path, "mkdir"),
+        ):
+            result = auth_from_file(token_path, creds_path)
+
+        assert result == new_creds
+        assert mock_pickle.dump.call_args.args[0] is new_creds  # the new sign-in is saved
+
+    @patch("gtasks.client.client_factory.InstalledAppFlow")
+    @patch("gtasks.client.client_factory.pickle")
+    def test_auth_from_file_GIVEN_refresh_fails_and_no_credentials_file_THEN_sign_in_required(
+        self,
+        mock_pickle: MagicMock,
+        mock_flow_class: MagicMock,
+        token_path: Path,
+        creds_path: Path,
+    ) -> None:
+        dead_creds = MagicMock(valid=False, expired=True, refresh_token="revoked")
+        dead_creds.refresh.side_effect = RefreshError("invalid_grant")
+        mock_pickle.load.return_value = dead_creds
+        mock_flow_class.from_client_secrets_file.side_effect = FileNotFoundError(str(creds_path))
+
+        with (
+            patch.object(Path, "exists", return_value=True),
+            patch.object(Path, "open", mock_open()),
+            pytest.raises(SignInRequiredError),
+        ):
+            auth_from_file(token_path, creds_path)

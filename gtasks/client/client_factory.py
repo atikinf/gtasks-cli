@@ -5,6 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -19,6 +20,15 @@ if TYPE_CHECKING:
 
 
 SCOPES: list[str] = ["https://www.googleapis.com/auth/tasks"]
+
+
+class SignInRequiredError(Exception):
+    """No usable saved sign-in, and no client secrets on disk to start a new one.
+
+    Raised instead of the underlying FileNotFoundError so callers can tell the user how
+    to sign in (e.g. `gtasks auth`, which supplies the secrets inline) rather than
+    reporting a missing file.
+    """
 
 
 def build_tasks_resource(
@@ -51,9 +61,18 @@ def _load_or_refresh_creds(
 
     if creds and creds.valid:
         return creds
-    elif creds and creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-    else:
+
+    refreshed = False
+    if creds and creds.expired and creds.refresh_token:
+        try:
+            creds.refresh(Request())
+            refreshed = True
+        except RefreshError:
+            # Revoked or long-expired refresh token: fall through and sign in again.
+            # Without this, `gtasks auth` could never replace a dead token.
+            pass
+
+    if not refreshed:
         flow = build_flow()
         # Perform auth via local web server and browser-based consent screen.
         creds = flow.run_local_server()
@@ -84,10 +103,14 @@ def auth(token_path: Path, client_id: str, client_secret: str) -> Credentials:
 
 def auth_from_file(token_path: Path, creds_path: Path) -> Credentials:
     """Authenticate using a `credentials.json` file (used by `build_tasks_resource`)."""
-    return _load_or_refresh_creds(
-        token_path,
-        lambda: InstalledAppFlow.from_client_secrets_file(str(creds_path), SCOPES),
-    )
+
+    def build_flow() -> InstalledAppFlow:
+        try:
+            return InstalledAppFlow.from_client_secrets_file(str(creds_path), SCOPES)
+        except FileNotFoundError as e:
+            raise SignInRequiredError(f"No saved sign-in and no {creds_path}") from e
+
+    return _load_or_refresh_creds(token_path, build_flow)
 
 
 def write_creds_to_file(creds: Credentials, token_path: Path) -> None:
