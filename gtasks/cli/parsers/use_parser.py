@@ -9,7 +9,7 @@ from rich.text import Text
 from gtasks.cli import ui
 from gtasks.cli.cli_utils import prompt_index_choice
 from gtasks.cli.errors import Cancelled, CliError
-from gtasks.cli.tasklist_resolution import choose_tasklist, set_active_tasklist
+from gtasks.cli.title_id_resolution import find_tasklist, set_active_tasklist
 from gtasks.utils.config import Config, ConfigKey
 
 if TYPE_CHECKING:
@@ -31,7 +31,7 @@ def cmd_use(
             raise Cancelled()
         tasklist = tasklists[choice]
     else:
-        tasklist = choose_tasklist(client.resolve_tasklist_from_title(args.name), args.name)
+        tasklist = find_tasklist(client, args.name)
 
     set_active_tasklist(cfg, tasklist)
     ui.success(Text.assemble("Active list: ", (tasklist.get("title", ""), "heading")))

@@ -37,21 +37,25 @@ To add a command: write the module pair, then register it in `build_parser`. Bar
 handled by a top-level `set_defaults` pointing at `cmd_list_tasks` with `limit=10`.
 
 **Which list a command acts on.** Every list-scoped handler calls
-`tasklist_resolution.resolve_target_tasklist`, whose precedence is: `-l/--list` flag >
+`title_id_resolution.resolve_target_tasklist`, whose precedence is: `-l/--list` flag >
 `$GTASKS_LIST` > the active list (`gtasks use`, stored by ID in config) > the account's
 `@default` list. A pre-ID `default_tasklist = <title>` config entry is migrated to the ID keys on
 first use. Register `-l` with `add_tasklist_option` — it's on the top-level parser too, so the
 subparser copies default to `argparse.SUPPRESS` to avoid clobbering `gtasks -l X done 1`.
 
-**Title→ID resolution.** Users address tasks and lists by title, never by API ID:
+**Title→ID resolution.** Users address tasks and lists by title, never by API ID. All of it lives
+in `cli/title_id_resolution.py`:
 
-- `ApiClient.resolve_tasklist_from_title` (case-insensitive) → `tasklist_resolution.choose_tasklist`
-  prompts only when titles collide; no match raises `CliError`.
-- `task_resolution.resolve_tasks_from_inputs` accepts titles or 1-based display numbers. Numbers
+- Matching is CLI policy, not a client method: `match_title` (case-insensitive, exact) filters
+  what `get_tasklists()` / `get_tasks()` return; `_choose_one` then prompts only when titles
+  collide, and no match raises `CliError`. Both are shared by lists and tasks.
+- Lists: `find_tasklist(client, title)` = `match_title` over `get_tasklists()` → `choose_tasklist`.
+- `resolve_tasks_from_inputs` accepts titles or 1-based display numbers. Numbers
   resolve against the last listing shown for that list (`utils/listing_state.py`, written by
   `cmd_list_tasks`), so `done 3` hits the task the user saw even if the list changed since; rows
-  are marked consumed after `done`/`delete`. With no recorded listing it fetches the needsAction
-  list. Any unresolvable input raises before a batch is sent.
+  are marked consumed after `done`/`delete`. With no recorded listing numbers index the
+  needsAction list; titles always match against it (open tasks only), fetched once per call.
+  Any unresolvable input raises before a batch is sent.
 
 **Output and errors.** All terminal output goes through `cli/ui.py` (rich, one `THEME` of semantic
 styles); handlers never `print`. User strings are wrapped in `Text`, never interpolated into rich
@@ -72,17 +76,20 @@ replace a revoked token.
 **Layers.** `cli/` (argparse + presentation) → `client/api_client.py` (thin Google Tasks wrapper,
 handles pagination in `_pagination_loop`) → `client/client_factory.py` (OAuth, builds the
 `TasksResource`). `ApiClient` is constructed from a `TasksResource`, which is what makes it
-trivially mockable in tests.
+trivially mockable in tests. `ApiClient` does mechanics only — snake_case → API names, pagination,
+batching — and no user-facing policy (matching, filtering): each method maps to one Tasks API
+operation (or a batch of one), named after the resource (`update_task`, `update_tasklist`).
+Unset optionals go through `_given()` so they're left out of the request: a `None` body field
+would be sent as JSON null, which a patch treats as "clear".
 
 **Contract layer.** `client/protocol.py` defines `TasksClient`, a structural `Protocol` mirroring
-`ApiClient`'s full public surface (16 methods, grouped by resource — tasklist reads/writes, task
-reads/writes, batch/bulk task mutations — then the two `resolve_*_from_title` lookups), so new
+`ApiClient`'s full public surface (14 methods, grouped by resource — tasklist reads/writes, task
+reads/writes, batch/bulk task mutations), plus the `Status` enum used by `update_task`, so new
 client code and new CLI commands can be typed against the contract without waiting on a consumer
-to exist. The CLI (`cmd_<name>` handlers in `cli/parsers/`, `task_resolution.py`,
-`tasklist_resolution.py`) currently consumes 8 of these (`get_tasklists`, `get_tasklist`,
-`resolve_tasklist_from_title`, `resolve_task_from_title`, `get_tasks`, `add_task`,
-`complete_tasks`, `delete_tasks`); the remaining 8 close the gap with the Tasks API v1 surface and
-aren't yet wired into any CLI command. Either way, the CLI types its client as `TasksClient`
+to exist. The CLI (`cmd_<name>` handlers in `cli/parsers/` and `title_id_resolution.py`) currently
+consumes 6 of these (`get_tasklists`, `get_tasklist`, `get_tasks`, `add_task`, `complete_tasks`,
+`delete_tasks`); the remaining 8 close the gap with the Tasks API v1 surface and aren't yet wired
+into any CLI command. Either way, the CLI types its client as `TasksClient`
 (handlers via `get_client: Callable[[], TasksClient]`), imported under
 `TYPE_CHECKING` since it's never instantiated there — only
 `client_factory.build_client()` constructs a real `ApiClient` and is declared to return

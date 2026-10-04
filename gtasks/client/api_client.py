@@ -1,14 +1,20 @@
-from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
+
+from gtasks.client.protocol import Status
 
 if TYPE_CHECKING:
     from googleapiclient._apis.tasks.v1.resources import TasksResource
     from googleapiclient._apis.tasks.v1.schemas import Task, TaskList
 
 
-class Status(Enum):
-    NEEDS_ACTION = "needsAction"
-    COMPLETED = "completed"
+def _given(**fields: Any) -> dict[str, Any]:
+    """Drop unset (None) values, so they're left out of a request rather than sent.
+
+    In a body that matters: None is sent as JSON null, which a patch takes as "clear this
+    field". googleapiclient already drops None query parameters, but its stubs type them
+    as `str`, so they go through here too.
+    """
+    return {k: v for k, v in fields.items() if v is not None}
 
 
 class ApiClient:
@@ -28,7 +34,7 @@ class ApiClient:
     def add_tasklist(self, tasklist_title: str) -> "TaskList":
         return self._service.tasklists().insert(body={"title": tasklist_title}).execute()
 
-    def rename_tasklist(self, tasklist_id: str, tasklist_title: str) -> "TaskList":
+    def update_tasklist(self, tasklist_id: str, tasklist_title: str) -> "TaskList":
         return self._service.tasklists().patch(
             tasklist=tasklist_id, body={"title": tasklist_title}
         ).execute()
@@ -40,18 +46,32 @@ class ApiClient:
         self,
         tasklist_id: str,
         max_results: int | None = None,
+        *,
         show_completed: bool = True,
+        show_hidden: bool = False,
+        show_deleted: bool = False,
+        show_assigned: bool = False,
         completed_min: str | None = None,
+        completed_max: str | None = None,
+        due_min: str | None = None,
+        due_max: str | None = None,
+        updated_min: str | None = None,
     ) -> list["Task"]:
-        # TODO: tasks.list also supports completedMax, dueMin/dueMax, showAssigned,
-        # showDeleted, showHidden, updatedMin — not exposed yet, may be useful later.
         tasks_resource: TasksResource.TasksResource = self._service.tasks()
         kwargs_init: dict[str, Any] = {
             "tasklist": tasklist_id,
             "showCompleted": show_completed,
+            "showHidden": show_hidden,
+            "showDeleted": show_deleted,
+            "showAssigned": show_assigned,
+            **_given(
+                completedMin=completed_min,
+                completedMax=completed_max,
+                dueMin=due_min,
+                dueMax=due_max,
+                updatedMin=updated_min,
+            ),
         }
-        if completed_min is not None:
-            kwargs_init["completedMin"] = completed_min
         return self._pagination_loop(kwargs_init, max_results, tasks_resource)
 
     def get_task(self, tasklist_id: str, task_id: str) -> "Task":
@@ -65,21 +85,12 @@ class ApiClient:
         due: str | None = None,
         parent_task_id: str | None = None,
         previous_task_id: str | None = None,
-    ) -> Task:
-        task_body: Task = {"title": task_title}
-        if notes is not None:
-            task_body["notes"] = notes
-        if due is not None:
-            task_body["due"] = due
-
-        insert_kwargs: dict[str, Any] = {"tasklist": tasklist_id, "body": task_body}
-        if parent_task_id is not None:
-            insert_kwargs["parent"] = parent_task_id
-        if previous_task_id is not None:
-            insert_kwargs["previous"] = previous_task_id
-
-        tasks_resource = self._service.tasks()
-        return tasks_resource.insert(**insert_kwargs).execute()
+    ) -> "Task":
+        return self._service.tasks().insert(
+            tasklist=tasklist_id,
+            body=cast("Task", _given(title=task_title, notes=notes, due=due)),
+            **_given(parent=parent_task_id, previous=previous_task_id),
+        ).execute()
 
     def update_task(
         self,
@@ -88,20 +99,22 @@ class ApiClient:
         task_title: str | None = None,
         notes: str | None = None,
         due: str | None = None,
+        status: Status | None = None,
     ) -> "Task":
         """Patch only the given fields; None means "leave unchanged", not "clear"."""
-        task_body: Task = {}
-        if task_title is not None:
-            task_body["title"] = task_title
-        if notes is not None:
-            task_body["notes"] = notes
-        if due is not None:
-            task_body["due"] = due
+        task_body = _given(
+            title=task_title,
+            notes=notes,
+            due=due,
+            status=status.value if status is not None else None,
+        )
         if not task_body:
-            raise ValueError("update_task requires at least one of task_title, notes, due")
+            raise ValueError(
+                "update_task requires at least one of task_title, notes, due, status"
+            )
 
         return self._service.tasks().patch(
-            tasklist=tasklist_id, task=task_id, body=task_body
+            tasklist=tasklist_id, task=task_id, body=cast("Task", task_body)
         ).execute()
 
     def move_task(
@@ -112,14 +125,15 @@ class ApiClient:
         previous_task_id: str | None = None,
         destination_tasklist_id: str | None = None,
     ) -> "Task":
-        kwargs: dict[str, str] = {"tasklist": tasklist_id, "task": task_id}
-        if parent_task_id is not None:
-            kwargs["parent"] = parent_task_id
-        if previous_task_id is not None:
-            kwargs["previous"] = previous_task_id
-        if destination_tasklist_id is not None:
-            kwargs["destinationTasklist"] = destination_tasklist_id
-        return self._service.tasks().move(**kwargs).execute()
+        return self._service.tasks().move(
+            tasklist=tasklist_id,
+            task=task_id,
+            **_given(
+                parent=parent_task_id,
+                previous=previous_task_id,
+                destinationTasklist=destination_tasklist_id,
+            ),
+        ).execute()
 
     def complete_tasks(self, tasklist_id: str, task_ids: list[str]) -> list["Task"]:
         return self._batch_patch_status(
@@ -147,22 +161,6 @@ class ApiClient:
         batch.execute()
         if errors:
             raise ExceptionGroup("batch delete_tasks failed", errors)
-
-    # TODO: revisit alongside cache work — resolve_task_from_title is pure composition
-    # over get_tasks() and could become a free function; resolve_tasklist_from_title
-    # does its own lookup and should probably stay a per-implementation method.
-
-    def resolve_tasklist_from_title(self, tasklist_title: str) -> list["TaskList"]:
-        return [
-            tl for tl in self.get_tasklists()
-            if tl.get("title", "").lower() == tasklist_title.lower() and tl.get("id") is not None
-        ]
-
-    def resolve_task_from_title(self, task_title: str, tasklist_id: str) -> list["Task"]:
-        return [
-            t for t in self.get_tasks(tasklist_id)
-            if t.get("title", "").lower() == task_title.lower() and t.get("id") is not None
-        ]
 
     def _batch_patch_status(
         self, tasklist_id: str, task_ids: list[str], status: Status, op_name: str
@@ -198,7 +196,7 @@ class ApiClient:
         n: int | None = max_results
 
         while True:
-            kwargs: dict[str, str] = kwargs_init
+            kwargs: dict[str, Any] = dict(kwargs_init)
             if page_token is not None:
                 kwargs["pageToken"] = page_token
             if n is not None:

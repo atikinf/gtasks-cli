@@ -5,8 +5,11 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from gtasks.cli import ui
-from gtasks.cli.task_resolution import resolve_tasks_from_inputs
-from gtasks.cli.tasklist_resolution import add_tasklist_option, resolve_target_tasklist
+from gtasks.cli.title_id_resolution import (
+    add_tasklist_option,
+    resolve_target_tasklist,
+    resolve_tasks_from_inputs,
+)
 from gtasks.utils.config import Config
 from gtasks.utils.listing_state import ListingState
 

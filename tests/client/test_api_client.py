@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from gtasks.client.api_client import ApiClient
+from gtasks.client.protocol import Status
 
 
 @pytest.fixture
@@ -94,6 +95,12 @@ class TestGetTasklists:
 
 class TestGetTasks:
     TASKLIST_ID = "tasklist123"
+    DEFAULT_FLAGS = {
+        "showCompleted": True,
+        "showHidden": False,
+        "showDeleted": False,
+        "showAssigned": False,
+    }
     MAX_TASKS = 3
     PAGE1_ITEMS = [{"id": "task1", "title": "Buy groceries"}]
     PAGE2_ITEMS = [{"id": "task2", "title": "Call mom"}]
@@ -130,7 +137,7 @@ class TestGetTasks:
         result = api_client.get_tasks(self.TASKLIST_ID)
 
         assert result == expected_tasks
-        service.tasks().list.assert_called_with(tasklist=self.TASKLIST_ID, showCompleted=True)
+        service.tasks().list.assert_called_with(tasklist=self.TASKLIST_ID, **self.DEFAULT_FLAGS)
 
     def test_get_tasks_GIVEN_empty_items_THEN_returns_empty_list(
         self, service: MagicMock, api_client: ApiClient
@@ -181,7 +188,7 @@ class TestGetTasks:
         api_client.get_tasks(self.TASKLIST_ID, show_completed=False)
 
         service.tasks().list.assert_called_with(
-            tasklist=self.TASKLIST_ID, showCompleted=False
+            tasklist=self.TASKLIST_ID, **{**self.DEFAULT_FLAGS, "showCompleted": False}
         )
 
     def test_get_tasks_GIVEN_completed_min_THEN_passes_to_api(
@@ -193,7 +200,7 @@ class TestGetTasks:
         api_client.get_tasks(self.TASKLIST_ID, completed_min=cutoff)
 
         service.tasks().list.assert_called_with(
-            tasklist=self.TASKLIST_ID, showCompleted=True, completedMin=cutoff
+            tasklist=self.TASKLIST_ID, **self.DEFAULT_FLAGS, completedMin=cutoff
         )
 
     def test_get_tasks_GIVEN_no_completed_min_THEN_omits_from_api(
@@ -205,6 +212,48 @@ class TestGetTasks:
 
         call_kwargs = service.tasks().list.call_args.kwargs
         assert "completedMin" not in call_kwargs
+
+    def test_get_tasks_GIVEN_all_filters_THEN_passes_them_by_api_name(
+        self, service: MagicMock, api_client: ApiClient
+    ) -> None:
+        service.tasks().list().execute.return_value = {"items": []}
+
+        api_client.get_tasks(
+            self.TASKLIST_ID,
+            show_completed=False,
+            show_hidden=True,
+            show_deleted=True,
+            show_assigned=True,
+            completed_min="2026-01-01T00:00:00Z",
+            completed_max="2026-02-01T00:00:00Z",
+            due_min="2026-03-01T00:00:00Z",
+            due_max="2026-04-01T00:00:00Z",
+            updated_min="2026-05-01T00:00:00Z",
+        )
+
+        service.tasks().list.assert_called_with(
+            tasklist=self.TASKLIST_ID,
+            showCompleted=False,
+            showHidden=True,
+            showDeleted=True,
+            showAssigned=True,
+            completedMin="2026-01-01T00:00:00Z",
+            completedMax="2026-02-01T00:00:00Z",
+            dueMin="2026-03-01T00:00:00Z",
+            dueMax="2026-04-01T00:00:00Z",
+            updatedMin="2026-05-01T00:00:00Z",
+        )
+
+    def test_get_tasks_GIVEN_multiple_pages_THEN_every_page_keeps_filters(
+        self, service: MagicMock, api_client: ApiClient
+    ) -> None:
+        service.tasks().list.side_effect = self._mock_paginated_list
+
+        api_client.get_tasks(self.TASKLIST_ID, show_completed=False)
+
+        calls = service.tasks().list.call_args_list
+        assert [c.kwargs.get("pageToken") for c in calls] == [None, "token1", "token2"]
+        assert all(c.kwargs["showCompleted"] is False for c in calls)
 
 
 class TestAddTask:
@@ -421,11 +470,11 @@ class TestAddTasklist:
         service.tasklists().insert.assert_called_with(body={"title": self.TASKLIST_TITLE})
 
 
-class TestRenameTasklist:
+class TestUpdateTasklist:
     TASKLIST_ID = "tasklist123"
     NEW_TITLE = "Renamed"
 
-    def test_rename_tasklist_GIVEN_new_title_THEN_patches_title(
+    def test_update_tasklist_GIVEN_new_title_THEN_patches_title(
         self, service: MagicMock, api_client: ApiClient
     ) -> None:
         expected_tasklist = {"id": self.TASKLIST_ID, "title": self.NEW_TITLE}
@@ -433,7 +482,7 @@ class TestRenameTasklist:
             tasklist=self.TASKLIST_ID, body={"title": self.NEW_TITLE}
         ).execute.return_value = expected_tasklist
 
-        result = api_client.rename_tasklist(self.TASKLIST_ID, self.NEW_TITLE)
+        result = api_client.update_tasklist(self.TASKLIST_ID, self.NEW_TITLE)
 
         assert result == expected_tasklist
         service.tasklists().patch.assert_called_with(
@@ -500,6 +549,17 @@ class TestUpdateTask:
             tasklist=self.TASKLIST_ID,
             task=self.TASK_ID,
             body={"notes": "Updated notes", "due": "2026-02-01T00:00:00.000Z"},
+        )
+
+    def test_update_task_GIVEN_status_THEN_patches_status_value(
+        self, service: MagicMock, api_client: ApiClient
+    ) -> None:
+        service.tasks().patch().execute.return_value = {"id": self.TASK_ID}
+
+        api_client.update_task(self.TASKLIST_ID, self.TASK_ID, status=Status.COMPLETED)
+
+        service.tasks().patch.assert_called_with(
+            tasklist=self.TASKLIST_ID, task=self.TASK_ID, body={"status": "completed"}
         )
 
     def test_update_task_GIVEN_no_fields_THEN_raises_value_error(

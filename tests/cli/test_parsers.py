@@ -311,13 +311,13 @@ class TestCmdAddTask:
         mock_client.add_task.assert_called_once_with(
             tasklist_id="list1", task_title="Test Task", notes=None, due=None
         )
-        mock_client.resolve_tasklist_from_title.assert_not_called()
+        mock_client.get_tasklists.assert_not_called()
         assert "✓ Added Test Task · Work" in capsys.readouterr().out
 
     def test_cmd_add_task_GIVEN_list_flag_THEN_overrides_active(
         self, mock_client: Mock, active_config: Config, base_args: dict
     ) -> None:
-        mock_client.resolve_tasklist_from_title.return_value = [{"id": "list2", "title": "Home"}]
+        mock_client.get_tasklists.return_value = [{"id": "list2", "title": "Home"}]
         mock_client.add_task.return_value = {"title": "Test Task"}
         base_args["tasklist_title"] = "home"
 
@@ -353,7 +353,7 @@ class TestCmdAddTask:
     def test_cmd_add_task_GIVEN_no_matching_tasklist_THEN_raises(
         self, mock_client: Mock, config: Config, base_args: dict
     ) -> None:
-        mock_client.resolve_tasklist_from_title.return_value = []
+        mock_client.get_tasklists.return_value = []
         base_args["tasklist_title"] = "NonExistent"
 
         with pytest.raises(CliError, match="No task list named 'NonExistent'"):
@@ -439,7 +439,7 @@ class TestCmdListTasks:
     def test_cmd_list_tasks_GIVEN_no_matching_tasklist_THEN_raises(
         self, mock_client: Mock, config: Config, base_args: dict
     ) -> None:
-        mock_client.resolve_tasklist_from_title.return_value = []
+        mock_client.get_tasklists.return_value = []
         base_args["tasklist_title"] = "NonExistent"
 
         with pytest.raises(CliError):
@@ -516,7 +516,7 @@ class TestCmdUse:
     def test_cmd_use_GIVEN_name_THEN_stores_id_and_canonical_title(
         self, mock_client: Mock, config: Config, capsys: CaptureFixture
     ) -> None:
-        mock_client.resolve_tasklist_from_title.return_value = [ACTIVE]
+        mock_client.get_tasklists.return_value = [ACTIVE]
 
         cmd_use(argparse.Namespace(name="work"), lambda: mock_client, config)
 
@@ -527,7 +527,7 @@ class TestCmdUse:
     def test_cmd_use_GIVEN_unknown_name_THEN_raises_and_keeps_previous(
         self, mock_client: Mock, active_config: Config
     ) -> None:
-        mock_client.resolve_tasklist_from_title.return_value = []
+        mock_client.get_tasklists.return_value = []
 
         with pytest.raises(CliError):
             cmd_use(argparse.Namespace(name="Nope"), lambda: mock_client, active_config)
@@ -623,7 +623,7 @@ class TestCmdDone:
     def test_cmd_done_GIVEN_single_title_THEN_completes_and_confirms_with_list(
         self, mock_client: Mock, active_config: Config, capsys: CaptureFixture
     ) -> None:
-        mock_client.resolve_task_from_title.return_value = [self.SAMPLE_TASKS[0]]
+        mock_client.get_tasks.return_value = self.SAMPLE_TASKS
         mock_client.complete_tasks.return_value = [
             {"id": "task1", "title": "Buy milk", "status": "completed"}
         ]
@@ -687,7 +687,7 @@ class TestCmdDelete:
     def test_cmd_delete_GIVEN_single_title_THEN_deletes_and_confirms_with_list(
         self, mock_client: Mock, active_config: Config, capsys: CaptureFixture
     ) -> None:
-        mock_client.resolve_task_from_title.return_value = [self.SAMPLE_TASKS[0]]
+        mock_client.get_tasks.return_value = self.SAMPLE_TASKS
 
         cmd_delete(argparse.Namespace(tasks=["Buy milk"]), lambda: mock_client, active_config)
 

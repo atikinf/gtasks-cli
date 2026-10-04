@@ -11,7 +11,7 @@ class ConfigKey(Enum):
 
 
 # Pre-ID versions stored the active list by title under this key. Read once and migrated
-# by tasklist_resolution; never written.
+# by title_id_resolution; never written.
 LEGACY_DEFAULT_TASKLIST_KEY = "default_tasklist"
 
 

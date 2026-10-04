@@ -6,10 +6,16 @@ wherever a `TasksClient` is expected, whether or not it inherits from `ApiClient
 subclassing or declaration is required or expected.
 """
 
+from enum import Enum
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from googleapiclient._apis.tasks.v1.schemas import Task, TaskList
+
+
+class Status(Enum):
+    NEEDS_ACTION = "needsAction"
+    COMPLETED = "completed"
 
 
 class TasksClient(Protocol):
@@ -19,7 +25,7 @@ class TasksClient(Protocol):
 
     def add_tasklist(self, tasklist_title: str) -> TaskList: ...
 
-    def rename_tasklist(self, tasklist_id: str, tasklist_title: str) -> TaskList: ...
+    def update_tasklist(self, tasklist_id: str, tasklist_title: str) -> TaskList: ...
 
     def delete_tasklist(self, tasklist_id: str) -> None: ...
 
@@ -27,8 +33,16 @@ class TasksClient(Protocol):
         self,
         tasklist_id: str,
         max_results: int | None = None,
+        *,
         show_completed: bool = True,
+        show_hidden: bool = False,
+        show_deleted: bool = False,
+        show_assigned: bool = False,
         completed_min: str | None = None,
+        completed_max: str | None = None,
+        due_min: str | None = None,
+        due_max: str | None = None,
+        updated_min: str | None = None,
     ) -> list[Task]: ...
 
     def get_task(self, tasklist_id: str, task_id: str) -> Task: ...
@@ -50,6 +64,7 @@ class TasksClient(Protocol):
         task_title: str | None = None,
         notes: str | None = None,
         due: str | None = None,
+        status: Status | None = None,
     ) -> Task: ...
 
     def move_task(
@@ -68,11 +83,3 @@ class TasksClient(Protocol):
     def clear_completed_tasks(self, tasklist_id: str) -> None: ...
 
     def delete_tasks(self, tasklist_id: str, task_ids: list[str]) -> None: ...
-
-    # TODO: revisit alongside cache work — resolve_task_from_title is pure composition
-    # over get_tasks() and could become a free function instead of a contract method;
-    # resolve_tasklist_from_title does its own lookup and should probably stay required.
-
-    def resolve_tasklist_from_title(self, tasklist_title: str) -> list[TaskList]: ...
-
-    def resolve_task_from_title(self, task_title: str, tasklist_id: str) -> list[Task]: ...

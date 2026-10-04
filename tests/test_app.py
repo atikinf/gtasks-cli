@@ -32,7 +32,7 @@ class TestMainErrorRouting:
     def test_main_GIVEN_cli_error_THEN_stderr_with_hint_and_exit_code(
         self, mock_client: Mock, capsys: CaptureFixture[str]
     ) -> None:
-        mock_client.resolve_tasklist_from_title.return_value = []
+        mock_client.get_tasklists.return_value = []
 
         code = main(["tasks", "-l", "Nope"])
 
@@ -60,7 +60,7 @@ class TestMainErrorRouting:
     def test_main_GIVEN_batch_failures_THEN_one_error_line_each(
         self, mock_client: Mock, capsys: CaptureFixture[str]
     ) -> None:
-        mock_client.resolve_tasklist_from_title.return_value = [{"id": "l1", "title": "W"}]
+        mock_client.get_tasklists.return_value = [{"id": "l1", "title": "W"}]
         mock_client.get_tasks.return_value = [{"id": "a", "title": "A"}, {"id": "b", "title": "B"}]
         mock_client.complete_tasks.side_effect = ExceptionGroup(
             "batch", [_http_error(500), ValueError("boom")]

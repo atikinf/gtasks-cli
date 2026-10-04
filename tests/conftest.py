@@ -6,7 +6,7 @@ import pytest
 from rich.console import Console
 
 from gtasks.cli import ui
-from gtasks.cli.tasklist_resolution import ENV_VAR
+from gtasks.cli.title_id_resolution import ENV_VAR
 
 
 def _plain_console(*, stderr: bool = False) -> Console:
