@@ -6,16 +6,20 @@ since). `gtasks tasks` records the (id, title) of each row it printed; `done`/`d
 resolve numbers against that record and mark the rows they consume so a repeated
 `delete 1` fails clearly instead of hitting a stale ID.
 
-Stored as JSON next to config.toml. This is app-managed state, not user configuration.
+Deliberately separate from the cache (`client/cache_store.py`): the cache tracks what's
+current and changes under writes, refetches and expiry, while this freezes what was shown.
+It shares the cache's folder and file conventions (`utils/json_files.py`) and is cleared with
+it. Not per account: it's keyed by list ID, and IDs never match across accounts.
 """
 
-import json
 from pathlib import Path
-from typing import TypedDict
+from typing import Any, TypedDict, TypeIs, cast
 
-from gtasks.utils.config import Config
+from gtasks import defaults
+from gtasks.utils.json_files import read_json, write_json
 
-STATE_FILE_NAME = "state.json"
+SCHEMA_VERSION = "1.0.0"
+LISTING_FILE_NAME = "listing.json"
 
 
 class ListingRow(TypedDict):
@@ -23,45 +27,51 @@ class ListingRow(TypedDict):
     title: str
 
 
+def _is_row(row: object) -> bool:
+    """A recorded row, or None for one already consumed."""
+    if row is None:
+        return True
+    return isinstance(row, dict) and isinstance(cast(dict[str, object], row).get("id"), str)
+
+
+def _is_rows(value: object) -> TypeIs[list[ListingRow | None]]:
+    return isinstance(value, list) and all(_is_row(row) for row in value)
+
+
 class ListingState:
-    def __init__(self, path: Path) -> None:
-        self._path = path
+    def __init__(self, root: Path) -> None:
+        self._root = root
+        self._path = root / LISTING_FILE_NAME
 
     @classmethod
-    def beside(cls, cfg: Config) -> "ListingState":
-        """The state file that lives in the same directory as `cfg`."""
-        return cls(cfg.path.parent / STATE_FILE_NAME)
+    def default(cls) -> "ListingState":
+        """The listing in the cache folder (read at call time, so tests can redirect it)."""
+        return cls(defaults.CACHE_DIR)
 
     def save(self, tasklist_id: str, tasks: list) -> None:
         rows = [{"id": t["id"], "title": t.get("title", "")} for t in tasks if t.get("id")]
-        self._write({"last_listing": {"tasklist_id": tasklist_id, "rows": rows}})
+        self._write(tasklist_id, rows)
 
     def rows(self, tasklist_id: str) -> list[ListingRow | None] | None:
         """Rows of the last listing of `tasklist_id`, or None if it wasn't the last one shown.
 
         A consumed row (already completed/deleted via its number) is None.
         """
-        listing = self._read().get("last_listing")
-        if not listing or listing.get("tasklist_id") != tasklist_id:
+        doc = read_json(self._path, SCHEMA_VERSION)
+        rows = doc.get("rows")
+        if doc.get("tasklist_id") != tasklist_id or not _is_rows(rows):
             return None
-        return listing.get("rows", [])
+        return rows
 
     def consume(self, tasklist_id: str, task_ids: list[str]) -> None:
         """Mark rows whose task was just completed or deleted."""
-        data = self._read()
-        listing = data.get("last_listing")
-        if not listing or listing.get("tasklist_id") != tasklist_id:
+        rows = self.rows(tasklist_id)
+        if rows is None:
             return
         gone = set(task_ids)
-        listing["rows"] = [None if r and r["id"] in gone else r for r in listing["rows"]]
-        self._write(data)
+        self._write(tasklist_id, [None if r and r["id"] in gone else r for r in rows])
 
-    def _read(self) -> dict:
-        try:
-            return json.loads(self._path.read_text())
-        except (FileNotFoundError, json.JSONDecodeError):
-            return {}
-
-    def _write(self, data: dict) -> None:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._path.write_text(json.dumps(data))
+    def _write(self, tasklist_id: str, rows: list[Any]) -> None:
+        write_json(
+            self._path, {"tasklist_id": tasklist_id, "rows": rows}, SCHEMA_VERSION, root=self._root
+        )

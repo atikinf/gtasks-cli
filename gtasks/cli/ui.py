@@ -7,6 +7,7 @@ User-supplied strings (task and list titles, notes) are only ever wrapped in `Te
 interpolated into rich markup, so a title like "[urgent] pay rent" renders verbatim.
 """
 
+import time
 from datetime import date, datetime, timezone
 from typing import TYPE_CHECKING
 
@@ -154,6 +155,11 @@ def _one_line(notes: str) -> str:
     return lines[0][: _NOTES_MAX - 1].rstrip() + "…"
 
 
+def cached_age(fetched_at: float | None) -> float | None:
+    """Seconds since cached data was fetched, or None if it was fetched live."""
+    return time.time() - fetched_at if fetched_at is not None else None
+
+
 def _cached_note(age: float | None) -> str:
     """` · cached 12m ago` for data at least a minute old; nothing for fresh data."""
     if age is None or age < 60:
@@ -228,10 +234,19 @@ def render_tasks(
 def render_tasklists(
     tasklists: "list[TaskList]",
     *,
+    heading: str | None = None,
     active_id: str | None = None,
     show_ids: bool = False,
+    cached_age: float | None = None,
 ) -> None:
-    """Print a numbered list of task lists, marking the active one."""
+    """Print a numbered list of task lists, marking the active one.
+
+    `cached_age` is how many seconds old the data is if it came from the cache.
+    """
+    if heading is not None:
+        details = f" · {len(tasklists)}{_cached_note(cached_age)}"
+        out().print(Text.assemble(_INDENT, (heading, "heading"), (details, "muted")))
+
     if not tasklists:
         out().print(Text(f"{_INDENT} No task lists.", style="muted"))
         return

@@ -152,7 +152,7 @@ class TestTasklists:
     def test_read_tasklists_GIVEN_written_THEN_returns_items(self, store: CacheStore) -> None:
         store.write_tasklists([{"id": "l1", "title": "Work"}])
 
-        assert store.read_tasklists() == [{"id": "l1", "title": "Work"}]
+        assert store.read_tasklists() == ([{"id": "l1", "title": "Work"}], T0)
 
     def test_default_GIVEN_written_alongside_lists_THEN_both_kept(
         self, store: CacheStore
@@ -161,7 +161,7 @@ class TestTasklists:
         store.write_default({"id": "l1", "title": "Work"})
 
         assert store.read_default() == {"id": "l1", "title": "Work"}
-        assert store.read_tasklists() == [{"id": "l1", "title": "Work"}]
+        assert store.read_tasklists() == ([{"id": "l1", "title": "Work"}], T0)
 
     def test_default_GIVEN_stale_THEN_none_but_fresh_lists_still_served(
         self, store: CacheStore, clock: Clock
@@ -278,7 +278,7 @@ class TestRobustness:
 
     def test_write_GIVEN_disk_full_THEN_silently_skipped(self, store: CacheStore) -> None:
         with patch(
-            "gtasks.client.cache_store.tempfile.mkstemp", side_effect=OSError(28, "No space")
+            "gtasks.utils.json_files.tempfile.mkstemp", side_effect=OSError(28, "No space")
         ):
             store.write_tasks("list1", TASKS)  # must not raise
 
@@ -287,7 +287,7 @@ class TestRobustness:
     def test_write_GIVEN_failure_after_temp_file_created_THEN_temp_file_removed(
         self, store: CacheStore, root: Path
     ) -> None:
-        with patch("gtasks.client.cache_store.os.replace", side_effect=OSError("boom")):
+        with patch("gtasks.utils.json_files.os.replace", side_effect=OSError("boom")):
             store.write_tasks("list1", TASKS)
 
         assert list((root / "acct" / "lists").iterdir()) == []

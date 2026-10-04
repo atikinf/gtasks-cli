@@ -3,12 +3,13 @@
 import argparse
 from typing import TYPE_CHECKING
 
+from gtasks import defaults
 from gtasks.cli import ui
 from gtasks.cli.cli_utils import prompt_setup_credentials
 from gtasks.cli.errors import Cancelled
 from gtasks.client.cache_store import clear_cache
 from gtasks.client.client_factory import auth
-from gtasks.defaults import APP_CFG_PATH, CACHE_DIR
+from gtasks.defaults import APP_CFG_PATH
 from gtasks.utils.config import Config
 
 if TYPE_CHECKING:
@@ -45,7 +46,7 @@ def cmd_auth(args: argparse.Namespace, get_client: "ClientProvider", cfg: Config
     auth(TOKEN_PATH, client_id, client_secret)
     # Cached data is per account, so this is tidiness, not correctness: drop what a previous
     # sign-in left behind.
-    clear_cache(CACHE_DIR)
+    clear_cache(defaults.CACHE_DIR)
     ui.success("Authenticated. You're ready to use gtasks.")
 
 

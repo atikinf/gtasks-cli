@@ -8,11 +8,12 @@ from typing import TYPE_CHECKING
 from google.auth.exceptions import RefreshError
 from googleapiclient.errors import HttpError
 
+from gtasks import defaults
 from gtasks.cli import ui
 from gtasks.cli.cli import build_parser
 from gtasks.cli.errors import Cancelled, CliError
 from gtasks.client.client_factory import SignInRequiredError, build_client
-from gtasks.defaults import CACHE_DIR, CONFIG_FILE_PATH
+from gtasks.defaults import CONFIG_FILE_PATH
 from gtasks.utils.config import Config, ConfigKey
 
 if TYPE_CHECKING:
@@ -47,7 +48,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         cfg = Config(CONFIG_FILE_PATH)
-        cache_dir = None if cfg.get(ConfigKey.CACHE) == "off" else CACHE_DIR
+        cache_dir = None if cfg.get(ConfigKey.CACHE) == "off" else defaults.CACHE_DIR
         force_fresh = getattr(args, "refresh", False)
 
         @cache

@@ -22,7 +22,7 @@ def cmd_delete(args: argparse.Namespace, get_client: "ClientProvider", cfg: Conf
     # Fresh: stale data here could make the write hit the wrong task.
     client = get_client(fresh=True)
     target = resolve_target_tasklist(args, client, cfg)
-    listing = ListingState.beside(cfg)
+    listing = ListingState.default()
     tasks = resolve_tasks_from_inputs(args.tasks, client, target.id, listing)
 
     task_ids = [t["id"] for t in tasks]

@@ -70,8 +70,10 @@ class CachingClient:
         # Lists fetched from the API during this run, so a write can merge into them
         # instead of refetching.
         self._fetched: dict[str, Tasks] = {}
-        # When the data last served for a list was fetched, if it came from the cache.
+        # When the data last served for a list (or for all lists) was fetched, if it came
+        # from the cache.
         self._served_at: dict[str, float] = {}
+        self._tasklists_served_at: float | None = None
 
     # --- Cache metadata --------------------------------------------------------------------
 
@@ -79,14 +81,21 @@ class CachingClient:
         """When the open tasks last returned for this list were fetched; None if live."""
         return self._served_at.get(tasklist_id)
 
+    def tasklists_fetched_at(self) -> float | None:
+        """When the task lists last returned were fetched; None if live."""
+        return self._tasklists_served_at
+
     # --- Task lists ------------------------------------------------------------------------
 
     def get_tasklists(self, max_results: int | None = None) -> "list[TaskList]":
-        items = None if self._fresh else self._store.read_tasklists()
-        if items is None:
+        cached = None if self._fresh else self._store.read_tasklists()
+        if cached is not None:
+            items, self._tasklists_served_at = cached
+        else:
             # Always fetch and store the full set; a limit is applied afterwards.
             items = cast(Tasks, self._inner.get_tasklists())
             self._store.write_tasklists(items)
+            self._tasklists_served_at = None
         return cast("list[TaskList]", items[:max_results] if max_results is not None else items)
 
     def get_tasklist(self, tasklist_id: str) -> "TaskList":
@@ -102,7 +111,8 @@ class CachingClient:
     def _cached_tasklist(self, tasklist_id: str) -> "TaskList | None":
         if tasklist_id == DEFAULT_TASKLIST_ID:
             return cast("TaskList | None", self._store.read_default())
-        for item in self._store.read_tasklists() or []:
+        cached = self._store.read_tasklists()
+        for item in cached[0] if cached is not None else []:
             if item.get("id") == tasklist_id:
                 return cast("TaskList", item)
         return None

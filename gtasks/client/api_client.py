@@ -166,6 +166,10 @@ class ApiClient:
         """Always None: every read is live."""
         return None
 
+    def tasklists_fetched_at(self) -> None:
+        """Always None: every read is live."""
+        return None
+
     def _batch_patch_status(
         self, tasklist_id: str, task_ids: list[str], status: Status, op_name: str
     ) -> list["Task"]:

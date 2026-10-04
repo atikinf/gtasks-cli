@@ -25,7 +25,13 @@ def cmd_list_tasklists(args: argparse.Namespace, get_client: "ClientProvider", c
         ):
             cfg.set(ConfigKey.ACTIVE_TASKLIST_TITLE, title)
 
-    ui.render_tasklists(tasklists, active_id=active_id, show_ids=args.show_ids)
+    ui.render_tasklists(
+        tasklists,
+        heading="Task lists",
+        active_id=active_id,
+        show_ids=args.show_ids,
+        cached_age=ui.cached_age(client.tasklists_fetched_at()),
+    )
 
 
 def add_subparser_lists(subparsers) -> None:

@@ -22,7 +22,12 @@ def cmd_use(args: argparse.Namespace, get_client: "ClientProvider", cfg: Config)
         tasklists = client.get_tasklists()
         if not tasklists:
             raise CliError("You have no task lists.")
-        ui.render_tasklists(tasklists, active_id=cfg.get(ConfigKey.ACTIVE_TASKLIST_ID))
+        ui.render_tasklists(
+            tasklists,
+            heading="Task lists",
+            active_id=cfg.get(ConfigKey.ACTIVE_TASKLIST_ID),
+            cached_age=ui.cached_age(client.tasklists_fetched_at()),
+        )
         choice = prompt_index_choice(len(tasklists), "Make which list active?", input)
         if choice is None:
             raise Cancelled()

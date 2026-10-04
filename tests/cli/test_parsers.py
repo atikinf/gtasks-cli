@@ -36,6 +36,7 @@ def mock_client() -> Mock:
     """Provide a mocked API client whose reads are always live (never from a cache)."""
     client = Mock()
     client.tasks_fetched_at.return_value = None
+    client.tasklists_fetched_at.return_value = None
     return client
 
 
@@ -422,7 +423,7 @@ class TestCmdListTasks:
         mock_client.get_tasks.return_value = self.SAMPLE_TASKS
         mock_client.tasks_fetched_at.return_value = 1_000_000.0
 
-        with patch("gtasks.cli.parsers.tasks_parser.time.time", return_value=1_000_000.0 + 300):
+        with patch("gtasks.cli.ui.time.time", return_value=1_000_000.0 + 300):
             cmd_list_tasks(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
 
         mock_client.tasks_fetched_at.assert_called_once_with("list1")
@@ -471,7 +472,7 @@ class TestCmdListTasks:
 
         cmd_list_tasks(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
 
-        assert ListingState.beside(active_config).rows("list1") == [
+        assert ListingState.default().rows("list1") == [
             {"id": "t1", "title": "Task 1"},
             {"id": "t2", "title": "Task 2"},
         ]
@@ -528,6 +529,17 @@ class TestCmdListTasklists:
 
         assert "● Work" in capsys.readouterr().out
 
+    def test_cmd_list_tasklists_GIVEN_cached_lists_THEN_heading_says_how_old(
+        self, mock_client: Mock, config: Config, base_args: dict, capsys: CaptureFixture
+    ) -> None:
+        mock_client.get_tasklists.return_value = self.SAMPLE_TASKLISTS
+        mock_client.tasklists_fetched_at.return_value = 1_000_000.0
+
+        with patch("gtasks.cli.ui.time.time", return_value=1_000_000.0 + 600):
+            cmd_list_tasklists(argparse.Namespace(**base_args), lambda **_: mock_client, config)
+
+        assert "Task lists · 2 · cached 10m ago" in capsys.readouterr().out
+
     def test_cmd_list_tasklists_GIVEN_active_list_renamed_THEN_refreshes_cached_title(
         self, mock_client: Mock, active_config: Config, base_args: dict
     ) -> None:
@@ -583,6 +595,16 @@ class TestCmdUse:
             cmd_use(argparse.Namespace(name=None), lambda **_: mock_client, config)
 
         assert config.get(ConfigKey.ACTIVE_TASKLIST_ID) == "list2"
+
+    def test_cmd_use_GIVEN_no_name_THEN_picker_has_heading(
+        self, mock_client: Mock, config: Config, capsys: CaptureFixture
+    ) -> None:
+        mock_client.get_tasklists.return_value = [ACTIVE, {"id": "list2", "title": "Home"}]
+
+        with patch("builtins.input", return_value="1"):
+            cmd_use(argparse.Namespace(name=None), lambda **_: mock_client, config)
+
+        assert capsys.readouterr().out.splitlines()[0].strip() == "Task lists · 2"
 
     def test_cmd_use_GIVEN_picker_cancelled_THEN_raises_cancelled(
         self, mock_client: Mock, config: Config
@@ -713,7 +735,7 @@ class TestCmdDone:
     def test_cmd_done_GIVEN_list_changed_since_listing_THEN_acts_on_task_user_saw(
         self, mock_client: Mock, active_config: Config
     ) -> None:
-        ListingState.beside(active_config).save("list1", self.SAMPLE_TASKS)
+        ListingState.default().save("list1", self.SAMPLE_TASKS)
         # Elsewhere, a new task was added at the top; #1 would now be "Surprise".
         mock_client.get_tasks.return_value = [{"id": "new", "title": "Surprise"}]
         mock_client.complete_tasks.return_value = [{"id": "task1", "title": "Buy milk"}]
@@ -726,7 +748,7 @@ class TestCmdDone:
     def test_cmd_done_GIVEN_same_number_twice_across_runs_THEN_second_run_raises(
         self, mock_client: Mock, active_config: Config
     ) -> None:
-        ListingState.beside(active_config).save("list1", self.SAMPLE_TASKS)
+        ListingState.default().save("list1", self.SAMPLE_TASKS)
         mock_client.complete_tasks.return_value = [{"id": "task1", "title": "Buy milk"}]
         cmd_done(argparse.Namespace(tasks=["1"]), lambda **_: mock_client, active_config)
 
@@ -797,7 +819,7 @@ class TestCmdDelete:
     def test_cmd_delete_GIVEN_one_bad_number_THEN_deletes_nothing(
         self, mock_client: Mock, active_config: Config
     ) -> None:
-        ListingState.beside(active_config).save("list1", self.SAMPLE_TASKS)
+        ListingState.default().save("list1", self.SAMPLE_TASKS)
 
         with pytest.raises(CliError):
             cmd_delete(argparse.Namespace(tasks=["1", "9"]), lambda **_: mock_client, active_config)

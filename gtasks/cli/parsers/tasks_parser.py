@@ -1,7 +1,6 @@
 """Tasks subcommand - list tasks from a task list."""
 
 import argparse
-import time
 from typing import TYPE_CHECKING
 
 from gtasks.cli import ui
@@ -34,9 +33,9 @@ def cmd_list_tasks(args: argparse.Namespace, get_client: "ClientProvider", cfg: 
         heading=target.title,
         show_ids=args.show_ids,
         truncated=truncated,
-        cached_age=time.time() - fetched_at if fetched_at is not None else None,
+        cached_age=ui.cached_age(fetched_at),
     )
-    ListingState.beside(cfg).save(target.id, tasks)
+    ListingState.default().save(target.id, tasks)
 
 
 def add_subparser_tasks(subparsers) -> None:

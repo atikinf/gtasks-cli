@@ -75,7 +75,7 @@ class TestTasklistReads:
     ) -> None:
         assert client.get_tasklists(1) == LISTS[:1]
         inner.get_tasklists.assert_called_once_with()
-        assert store.read_tasklists() == LISTS  # never a partial copy
+        assert store.read_tasklists() == (LISTS, T0)  # never a partial copy
 
     def test_get_tasklists_GIVEN_expired_THEN_refetches(
         self, client: CachingClient, inner: MagicMock, clock: Clock
@@ -86,6 +86,21 @@ class TestTasklistReads:
         client.get_tasklists()
 
         assert inner.get_tasklists.call_count == 2
+
+    def test_tasklists_fetched_at_GIVEN_cache_hit_THEN_fetch_time_else_none(
+        self, client: CachingClient, inner: MagicMock, store: CacheStore, clock: Clock
+    ) -> None:
+        client.get_tasklists()
+        assert client.tasklists_fetched_at() is None  # fetched live
+
+        clock.t += 600
+        later = CachingClient(inner, store)
+        later.get_tasklists()
+        assert later.tasklists_fetched_at() == T0
+
+        fresh = CachingClient(inner, store, fresh=True)
+        fresh.get_tasklists()
+        assert fresh.tasklists_fetched_at() is None
 
     def test_get_tasklist_GIVEN_id_in_cached_lists_THEN_no_api_call(
         self, client: CachingClient, inner: MagicMock

@@ -8,10 +8,10 @@ from googleapiclient.errors import HttpError
 from httplib2 import Response
 from pytest import CaptureFixture
 
+from gtasks import defaults
 from gtasks.app import main
 from gtasks.cli.errors import CliError
 from gtasks.client.client_factory import SignInRequiredError
-from gtasks.defaults import CACHE_DIR
 
 
 def _http_error(status: int) -> HttpError:
@@ -101,6 +101,9 @@ def build_client(tmp_path: Path) -> Iterator[Mock]:
         patch("gtasks.app.build_client") as build_client,
         patch("gtasks.app.CONFIG_FILE_PATH", tmp_path / "config.toml"),
     ):
+        # Reads are live unless a test says otherwise (no "cached Xm ago" note).
+        build_client.return_value.tasks_fetched_at.return_value = None
+        build_client.return_value.tasklists_fetched_at.return_value = None
         yield build_client
 
 
@@ -120,11 +123,8 @@ class TestMainClientConstruction:
         assert code == 130  # reached auth's own prompt and the user cancelled
         build_client.assert_not_called()
 
-    def test_main_GIVEN_successful_auth_THEN_clears_cache(
-        self, build_client: Mock, tmp_path: Path
-    ) -> None:
-        cache_dir = tmp_path / "cache"
-        (cache_dir / "old-account").mkdir(parents=True)
+    def test_main_GIVEN_successful_auth_THEN_clears_cache(self, build_client: Mock) -> None:
+        (defaults.CACHE_DIR / "old-account").mkdir(parents=True)  # tmp dir, via conftest
 
         with (
             patch(
@@ -132,11 +132,10 @@ class TestMainClientConstruction:
                 return_value=("id", "secret"),
             ),
             patch("gtasks.cli.parsers.auth_parser.auth"),
-            patch("gtasks.cli.parsers.auth_parser.CACHE_DIR", cache_dir),
         ):
             assert main(["auth"]) == 0
 
-        assert not cache_dir.exists()
+        assert not defaults.CACHE_DIR.exists()
         build_client.assert_not_called()
 
     def test_main_GIVEN_config_THEN_never_builds_client(self, build_client: Mock) -> None:
@@ -151,7 +150,7 @@ class TestMainClientConstruction:
         build_client.return_value.get_tasklists.return_value = []
 
         assert main(["lists"]) == 0
-        build_client.assert_called_once_with(fresh=False, cache_dir=CACHE_DIR)
+        build_client.assert_called_once_with(fresh=False, cache_dir=defaults.CACHE_DIR)
 
     @pytest.mark.parametrize(
         "argv",
@@ -175,7 +174,7 @@ class TestMainClientConstruction:
         build_client.return_value.complete_tasks.return_value = [{"id": "t", "title": "Milk"}]
 
         assert main(["done", "Milk"]) == 0
-        build_client.assert_called_once_with(fresh=True, cache_dir=CACHE_DIR)
+        build_client.assert_called_once_with(fresh=True, cache_dir=defaults.CACHE_DIR)
 
     def test_main_GIVEN_cache_off_THEN_no_cache_dir(
         self, build_client: Mock, tmp_path: Path

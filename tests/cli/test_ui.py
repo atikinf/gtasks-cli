@@ -165,6 +165,32 @@ class TestRenderTasklists:
         assert ui.ACTIVE_MARK not in lines[0]
         assert f"{ui.ACTIVE_MARK} Home" in lines[1]
 
+    @pytest.mark.parametrize(
+        "age, heading",
+        [
+            (None, "Task lists · 2"),
+            (59, "Task lists · 2"),
+            (12 * 60, "Task lists · 2 · cached 12m ago"),
+        ],
+        ids=["live", "under-a-minute", "cached"],
+    )
+    def test_render_tasklists_GIVEN_heading_THEN_count_and_cache_age(
+        self, consoles: tuple[Console, Console], age: float | None, heading: str
+    ) -> None:
+        tasklists = [{"id": "l1", "title": "Work"}, {"id": "l2", "title": "Home"}]
+
+        ui.render_tasklists(tasklists, heading="Task lists", cached_age=age)
+
+        assert _text(consoles[0]).splitlines()[0].strip() == heading
+
+    def test_render_tasklists_GIVEN_no_heading_THEN_rows_only(
+        self, consoles: tuple[Console, Console]
+    ) -> None:
+        """The "several lists match" prompt shows bare rows."""
+        ui.render_tasklists([{"id": "l1", "title": "Work"}])
+
+        assert _text(consoles[0]).splitlines()[0].strip() == "1   Work"
+
     def test_render_tasklists_GIVEN_show_ids_THEN_includes_ids(
         self, consoles: tuple[Console, Console]
     ) -> None:

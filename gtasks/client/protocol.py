@@ -95,6 +95,11 @@ class TasksClient(Protocol):
         they came from a cache; None if they were fetched live."""
         ...
 
+    def tasklists_fetched_at(self) -> float | None:
+        """When the task lists last returned were fetched (a Unix time), if they came from a
+        cache; None if they were fetched live."""
+        ...
+
 
 class ClientProvider(Protocol):
     """What handlers receive as `get_client`: builds (once per run) the client to use.

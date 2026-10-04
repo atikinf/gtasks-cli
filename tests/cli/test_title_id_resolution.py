@@ -301,7 +301,7 @@ class TestResolveAgainstLastListing:
 
     @pytest.fixture
     def listing(self, tmp_path: Path) -> ListingState:
-        listing = ListingState(tmp_path / "state.json")
+        listing = ListingState(tmp_path)
         listing.save("list1", self.SHOWN)
         return listing
 
