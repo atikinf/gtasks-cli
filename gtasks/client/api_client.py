@@ -162,12 +162,12 @@ class ApiClient:
         if errors:
             raise ExceptionGroup("batch delete_tasks failed", errors)
 
-    def tasks_fetched_at(self, tasklist_id: str) -> None:
-        """Always None: every read is live."""
+    def tasks_cache_state(self, tasklist_id: str) -> None:
+        """Always None: no cache is involved."""
         return None
 
-    def tasklists_fetched_at(self) -> None:
-        """Always None: every read is live."""
+    def tasklists_cache_state(self) -> None:
+        """Always None: no cache is involved."""
         return None
 
     def _batch_patch_status(

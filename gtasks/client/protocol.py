@@ -6,6 +6,7 @@ wherever a `TasksClient` is expected, whether or not it inherits from `ApiClient
 subclassing or declaration is required or expected.
 """
 
+from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Protocol
 
@@ -15,6 +16,16 @@ if TYPE_CHECKING:
 
 # Tasks API alias for the account's primary list ("My Tasks"), accepted wherever a list ID is.
 DEFAULT_TASKLIST_ID = "@default"
+
+
+@dataclass(frozen=True)
+class CacheState:
+    """How data a client just returned relates to its cache, so the CLI can say so."""
+
+    # True: served from the cache. False: fetched live just now and saved to the cache.
+    from_cache: bool
+    # When the data was fetched from Google (a Unix time).
+    fetched_at: float
 
 
 class Status(Enum):
@@ -88,16 +99,15 @@ class TasksClient(Protocol):
 
     def delete_tasks(self, tasklist_id: str, task_ids: list[str]) -> None: ...
 
-    # Not part of the Tasks API: lets callers say when they're showing cached data.
+    # Not part of the Tasks API: lets callers say whether data came from (or went into) a cache.
 
-    def tasks_fetched_at(self, tasklist_id: str) -> float | None:
-        """When the open tasks last returned for this list were fetched (a Unix time), if
-        they came from a cache; None if they were fetched live."""
+    def tasks_cache_state(self, tasklist_id: str) -> CacheState | None:
+        """Cache state of the open tasks last returned for this list; None if no cache was
+        involved (no cache, or live data that couldn't be saved)."""
         ...
 
-    def tasklists_fetched_at(self) -> float | None:
-        """When the task lists last returned were fetched (a Unix time), if they came from a
-        cache; None if they were fetched live."""
+    def tasklists_cache_state(self) -> CacheState | None:
+        """Cache state of the task lists last returned; None if no cache was involved."""
         ...
 
 

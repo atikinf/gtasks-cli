@@ -27,7 +27,7 @@ def cmd_use(args: argparse.Namespace, get_client: "ClientProvider", cfg: Config)
             tasklists,
             heading="Task lists",
             active_id=cfg.get(ConfigKey.ACTIVE_TASKLIST_ID),
-            cached_age=ui.cached_age(client.tasklists_fetched_at()),
+            cache=client.tasklists_cache_state(),
         )
         choice = prompt_index_choice(len(tasklists), "Make which list active?", input)
         if choice is None:

@@ -19,6 +19,8 @@ from rich.theme import Theme
 if TYPE_CHECKING:
     from googleapiclient._apis.tasks.v1.schemas import Task, TaskList
 
+    from gtasks.client.protocol import CacheState
+
 THEME = Theme(
     {
         "muted": "dim",
@@ -162,15 +164,20 @@ def _one_line(notes: str) -> str:
     return lines[0][: _NOTES_MAX - 1].rstrip() + "…"
 
 
-def cached_age(fetched_at: float | None) -> float | None:
-    """Seconds since cached data was fetched, or None if it was fetched live."""
-    return time.time() - fetched_at if fetched_at is not None else None
+def _cache_note(cache: "CacheState | None") -> str:
+    """Say how the data relates to the cache, so cached output is never mistaken for live:
 
-
-def _cached_note(age: float | None) -> str:
-    """` · cached 12m ago` for data at least a minute old; nothing for fresh data."""
-    if age is None or age < 60:
+    ` · cache refreshed`              fetched live just now and saved to the cache
+    ` · cached just now` / `12m ago`  served from the cache
+    nothing                           live with no cache involved (`cache off`, or not saved)
+    """
+    if cache is None:
         return ""
+    if not cache.from_cache:
+        return " · cache refreshed"
+    age = time.time() - cache.fetched_at
+    if age < 60:
+        return " · cached just now"
     return f" · cached {int(age // 60)}m ago"
 
 
@@ -180,20 +187,20 @@ def render_tasks(
     heading: str | None = None,
     show_ids: bool = False,
     truncated: bool = False,
-    cached_age: float | None = None,
+    cache: "CacheState | None" = None,
     today: date | None = None,
 ) -> None:
     """Print a numbered task table; numbers match what `done`/`delete` accept.
 
     `truncated` means more tasks exist than were passed (a --limit cut the list short).
-    `cached_age` is how many seconds old the data is if it came from the cache.
+    `cache` says whether the tasks came from (or were just saved to) the cache.
     """
     today = today or date.today()
 
     if heading is not None:
         open_count = sum(1 for t in tasks if t.get("status") != "completed")
         count = f"{open_count}+" if truncated else str(open_count)
-        details = f" · {count} open{_cached_note(cached_age)}"
+        details = f" · {count} open{_cache_note(cache)}"
         out().print(Text.assemble(_INDENT, (heading, "heading"), (details, "muted")))
 
     if not tasks:
@@ -244,14 +251,14 @@ def render_tasklists(
     heading: str | None = None,
     active_id: str | None = None,
     show_ids: bool = False,
-    cached_age: float | None = None,
+    cache: "CacheState | None" = None,
 ) -> None:
     """Print a numbered list of task lists, marking the active one.
 
-    `cached_age` is how many seconds old the data is if it came from the cache.
+    `cache` says whether the lists came from (or were just saved to) the cache.
     """
     if heading is not None:
-        details = f" · {len(tasklists)}{_cached_note(cached_age)}"
+        details = f" · {len(tasklists)}{_cache_note(cache)}"
         out().print(Text.assemble(_INDENT, (heading, "heading"), (details, "muted")))
 
     if not tasklists:

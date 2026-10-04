@@ -1,12 +1,12 @@
 import threading
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from gtasks.client.cache_store import DEFAULT_TTL_SECONDS, CacheStore
 from gtasks.client.caching_client import CachingClient
-from gtasks.client.protocol import Status
+from gtasks.client.protocol import CacheState, Status
 
 T0 = 1_000_000.0
 LISTS = [{"id": "l1", "title": "Work"}, {"id": "l2", "title": "Home"}]
@@ -87,20 +87,30 @@ class TestTasklistReads:
 
         assert inner.get_tasklists.call_count == 2
 
-    def test_tasklists_fetched_at_GIVEN_cache_hit_THEN_fetch_time_else_none(
+    def test_tasklists_cache_state_GIVEN_live_then_hit_then_fresh_THEN_added_cached_added(
         self, client: CachingClient, inner: MagicMock, store: CacheStore, clock: Clock
     ) -> None:
         client.get_tasklists()
-        assert client.tasklists_fetched_at() is None  # fetched live
+        assert client.tasklists_cache_state() == CacheState(from_cache=False, fetched_at=T0)
 
         clock.t += 600
         later = CachingClient(store, make_inner=lambda: inner)
         later.get_tasklists()
-        assert later.tasklists_fetched_at() == T0
+        assert later.tasklists_cache_state() == CacheState(from_cache=True, fetched_at=T0)
 
         fresh = CachingClient(store, make_inner=lambda: inner, fresh=True)
         fresh.get_tasklists()
-        assert fresh.tasklists_fetched_at() is None
+        assert fresh.tasklists_cache_state() == CacheState(from_cache=False, fetched_at=T0 + 600)
+
+    def test_tasklists_cache_state_GIVEN_live_data_not_saved_THEN_none(
+        self, inner: MagicMock, store: CacheStore
+    ) -> None:
+        """Never claim "cache refreshed" when the save failed."""
+        with patch.object(CacheStore, "write_tasklists", return_value=None):
+            client = CachingClient(store, make_inner=lambda: inner)
+            client.get_tasklists()
+
+        assert client.tasklists_cache_state() is None
 
     def test_get_tasklist_GIVEN_id_in_cached_lists_THEN_no_api_call(
         self, client: CachingClient, inner: MagicMock
@@ -180,17 +190,29 @@ class TestTaskReads:
 
         assert inner.get_tasks.call_count == 2
 
-    def test_tasks_fetched_at_GIVEN_cache_hit_THEN_fetch_time_else_none(
+    def test_tasks_cache_state_GIVEN_live_then_hit_THEN_added_then_cached(
         self, client: CachingClient, inner: MagicMock, store: CacheStore, clock: Clock
     ) -> None:
         client.get_tasks("l1", show_completed=False)
-        assert client.tasks_fetched_at("l1") is None  # fetched live
+        assert client.tasks_cache_state("l1") == CacheState(from_cache=False, fetched_at=T0)
 
         clock.t += 600
         later = CachingClient(store, make_inner=lambda: inner)
         later.get_tasks("l1", show_completed=False)
 
-        assert later.tasks_fetched_at("l1") == T0
+        assert later.tasks_cache_state("l1") == CacheState(from_cache=True, fetched_at=T0)
+
+    def test_tasks_cache_state_GIVEN_live_data_not_saved_THEN_none(
+        self, inner: MagicMock, store: CacheStore
+    ) -> None:
+        with patch.object(CacheStore, "write_tasks", return_value=None):
+            client = CachingClient(store, make_inner=lambda: inner)
+            client.get_tasks("l1", show_completed=False)
+
+        assert client.tasks_cache_state("l1") is None
+
+    def test_tasks_cache_state_GIVEN_list_never_read_THEN_none(self, client: CachingClient) -> None:
+        assert client.tasks_cache_state("l1") is None
 
     def test_get_task_THEN_always_passes_through(
         self, client: CachingClient, inner: MagicMock

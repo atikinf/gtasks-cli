@@ -95,8 +95,11 @@ class CacheStore:
             return None
         return items, float(entry["fetched_at"])
 
-    def write_tasklists(self, items: Tasks) -> None:
-        self._update_tasklists_doc("lists", {"fetched_at": self._now(), "items": items})
+    def write_tasklists(self, items: Tasks) -> float | None:
+        """Store all lists; returns the fetch time recorded, or None if they couldn't be saved."""
+        now = self._now()
+        saved = self._update_tasklists_doc("lists", {"fetched_at": now, "items": items})
+        return now if saved else None
 
     def read_default(self) -> dict[str, Any] | None:
         """The list `@default` last resolved to, if fresh."""
@@ -122,9 +125,13 @@ class CacheStore:
             return None
         return tasks, fetched_at
 
-    def write_tasks(self, tasklist_id: str, tasks: Tasks) -> None:
-        """Store a full fetch; this is the only way the list's timestamp moves forward."""
-        self._write_tasks_doc(tasklist_id, tasks, self._now())
+    def write_tasks(self, tasklist_id: str, tasks: Tasks) -> float | None:
+        """Store a full fetch; this is the only way the list's timestamp moves forward.
+
+        Returns the fetch time recorded, or None if the tasks couldn't be saved.
+        """
+        now = self._now()
+        return now if self._write_tasks_doc(tasklist_id, tasks, now) else None
 
     def update_tasks(self, tasklist_id: str, change: Callable[[Tasks], Tasks | None]) -> None:
         """Apply a write-through edit, keeping the original fetch time.
@@ -168,24 +175,26 @@ class CacheStore:
             return None
         return float(fetched_at)
 
-    def _write_tasks_doc(self, tasklist_id: str, tasks: Tasks, fetched_at: float) -> None:
-        self._write(
+    def _write_tasks_doc(self, tasklist_id: str, tasks: Tasks, fetched_at: float) -> bool:
+        return self._write(
             self._tasks_path(tasklist_id),
             {"tasklist_id": tasklist_id, "fetched_at": fetched_at, "tasks": tasks},
         )
 
-    def _update_tasklists_doc(self, key: str, entry: dict[str, Any]) -> None:
+    def _update_tasklists_doc(self, key: str, entry: dict[str, Any]) -> bool:
         path = self._dir / _TASKLISTS_FILE
         doc = self._read(path)
         doc[key] = entry
-        self._write(path, doc)
+        return self._write(path, doc)
 
     def _read(self, path: Path) -> dict[str, Any]:
         return read_json(path, SCHEMA_VERSION)
 
-    def _write(self, path: Path, doc: dict[str, Any]) -> None:
-        if write_json(path, doc, SCHEMA_VERSION, root=self._root):
-            self._point_at_account()
+    def _write(self, path: Path, doc: dict[str, Any]) -> bool:
+        if not write_json(path, doc, SCHEMA_VERSION, root=self._root):
+            return False
+        self._point_at_account()
+        return True
 
     def _point_at_account(self) -> None:
         """Record the active account so readers without credentials (completion) find it."""

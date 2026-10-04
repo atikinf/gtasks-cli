@@ -30,7 +30,7 @@ def cmd_list_tasklists(args: argparse.Namespace, get_client: "ClientProvider", c
         heading="Task lists",
         active_id=active_id,
         show_ids=args.show_ids,
-        cached_age=ui.cached_age(client.tasklists_fetched_at()),
+        cache=client.tasklists_cache_state(),
     )
 
 

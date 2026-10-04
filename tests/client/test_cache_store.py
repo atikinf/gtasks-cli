@@ -359,3 +359,18 @@ class TestForCurrentAccount:
         (root / "current").write_text(content)
 
         assert CacheStore.for_current_account(root) is None
+
+
+class TestWriteResults:
+    """Writes report whether they were saved, so the CLI never claims "cache refreshed" falsely."""
+
+    def test_write_tasks_GIVEN_saved_THEN_returns_fetch_time(self, store: CacheStore) -> None:
+        assert store.write_tasks("list1", TASKS) == T0
+
+    def test_write_tasklists_GIVEN_saved_THEN_returns_fetch_time(self, store: CacheStore) -> None:
+        assert store.write_tasklists([{"id": "l1"}]) == T0
+
+    def test_writes_GIVEN_disk_full_THEN_none(self, store: CacheStore) -> None:
+        with patch("gtasks.utils.json_files.tempfile.mkstemp", side_effect=OSError(28, "full")):
+            assert store.write_tasks("list1", TASKS) is None
+            assert store.write_tasklists([{"id": "l1"}]) is None

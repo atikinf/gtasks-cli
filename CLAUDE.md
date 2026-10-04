@@ -100,11 +100,13 @@ data but still stores what it fetches; `--refresh` makes any command fresh (regi
 `cli_utils.add_refresh_option` on every subcommand that uses the API). Task writes refetch
 the list concurrently on a second client (`make_refresher`: its own httplib2 connection, which
 isn't thread-safe to share, with a timeout) and merge the write's result into that copy;
-anything not safely mergeable drops the list's file instead. `tasks_fetched_at` and
-`tasklists_fetched_at` (the protocol's only non-API methods) let `tasks`, `lists` and the `use`
-picker show "cached 12m ago" in their headings. The listing snapshot (`listing.json`) is
-deliberately separate: it freezes what was shown so numbers never shift, while the cache tracks
-what's current.
+anything not safely mergeable drops the list's file instead. `tasks_cache_state` and
+`tasklists_cache_state` (the protocol's only non-API methods; `ApiClient` returns `None`) return a
+`CacheState(from_cache, fetched_at)` so `tasks`, `lists` and the `use` picker can say
+"cache refreshed" (fetched live and saved), "cached 12m ago" (served from it), or nothing (no
+cache involved). Store writes return the recorded fetch time or `None`, so a failed save is
+never reported as "refreshed". The listing snapshot (`listing.json`) is deliberately separate: it
+freezes what was shown so numbers never shift, while the cache tracks what's current.
 
 **Batch mutations.** `done` and `delete` accept multiple tasks and issue one
 `new_batch_http_request`; partial failures are collected and raised as an `ExceptionGroup`.
@@ -120,8 +122,8 @@ would be sent as JSON null, which a patch treats as "clear".
 
 **Contract layer.** `client/protocol.py` defines `TasksClient`, a structural `Protocol` mirroring
 `ApiClient`'s full public surface (14 methods, grouped by resource — tasklist reads/writes, task
-reads/writes, batch/bulk task mutations) plus `tasks_fetched_at`/`tasklists_fetched_at` (cache
-metadata; `ApiClient` returns `None`), the `Status` enum used by `update_task`, and
+reads/writes, batch/bulk task mutations) plus `tasks_cache_state`/`tasklists_cache_state` (cache
+metadata, as `CacheState`; `ApiClient` returns `None`), the `Status` enum used by `update_task`, and
 `ClientProvider`, so new client code and new CLI commands can be typed against the contract
 without waiting on a consumer to exist. The CLI (`cmd_<name>` handlers in `cli/parsers/` and `title_id_resolution.py`) currently
 consumes 6 of these (`get_tasklists`, `get_tasklist`, `get_tasks`, `add_task`, `complete_tasks`,

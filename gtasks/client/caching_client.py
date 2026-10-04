@@ -17,7 +17,7 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, cast
 
 from gtasks.client.cache_store import CacheStore, Tasks
-from gtasks.client.protocol import DEFAULT_TASKLIST_ID, Status
+from gtasks.client.protocol import DEFAULT_TASKLIST_ID, CacheState, Status
 
 if TYPE_CHECKING:
     from googleapiclient._apis.tasks.v1.schemas import Task, TaskList
@@ -26,6 +26,11 @@ if TYPE_CHECKING:
 
 # A merge either returns the new task list, or None for "can't tell, drop the cached copy".
 Merge = Callable[[Tasks], Tasks | None]
+
+
+def _saved(fetched_at: float | None) -> CacheState | None:
+    """State for data fetched live: saved to the cache at `fetched_at`, or None if not saved."""
+    return CacheState(from_cache=False, fetched_at=fetched_at) if fetched_at is not None else None
 
 
 class _Refetch:
@@ -73,10 +78,9 @@ class CachingClient:
         # Lists fetched from the API during this run, so a write can merge into them
         # instead of refetching.
         self._fetched: dict[str, Tasks] = {}
-        # When the data last served for a list (or for all lists) was fetched, if it came
-        # from the cache.
-        self._served_at: dict[str, float] = {}
-        self._tasklists_served_at: float | None = None
+        # How the data last returned for a list (or for all lists) relates to the cache.
+        self._tasks_state: dict[str, CacheState | None] = {}
+        self._tasklists_state: CacheState | None = None
 
     def _inner(self) -> "TasksClient":
         if self._inner_client is None:
@@ -85,25 +89,25 @@ class CachingClient:
 
     # --- Cache metadata --------------------------------------------------------------------
 
-    def tasks_fetched_at(self, tasklist_id: str) -> float | None:
-        """When the open tasks last returned for this list were fetched; None if live."""
-        return self._served_at.get(tasklist_id)
+    def tasks_cache_state(self, tasklist_id: str) -> CacheState | None:
+        """Served from the cache, or fetched live and saved to it; None if neither."""
+        return self._tasks_state.get(tasklist_id)
 
-    def tasklists_fetched_at(self) -> float | None:
-        """When the task lists last returned were fetched; None if live."""
-        return self._tasklists_served_at
+    def tasklists_cache_state(self) -> CacheState | None:
+        """Served from the cache, or fetched live and saved to it; None if neither."""
+        return self._tasklists_state
 
     # --- Task lists ------------------------------------------------------------------------
 
     def get_tasklists(self, max_results: int | None = None) -> "list[TaskList]":
         cached = None if self._fresh else self._store.read_tasklists()
         if cached is not None:
-            items, self._tasklists_served_at = cached
+            items = cached[0]
+            self._tasklists_state = CacheState(from_cache=True, fetched_at=cached[1])
         else:
             # Always fetch and store the full set; a limit is applied afterwards.
             items = cast(Tasks, self._inner().get_tasklists())
-            self._store.write_tasklists(items)
-            self._tasklists_served_at = None
+            self._tasklists_state = _saved(self._store.write_tasklists(items))
         return cast("list[TaskList]", items[:max_results] if max_results is not None else items)
 
     def get_tasklist(self, tasklist_id: str) -> "TaskList":
@@ -183,13 +187,12 @@ class CachingClient:
             cached = self._store.read_tasks(tasklist_id)
             if cached is not None:
                 tasks, fetched_at = cached
-                self._served_at[tasklist_id] = fetched_at
+                self._tasks_state[tasklist_id] = CacheState(from_cache=True, fetched_at=fetched_at)
                 return tasks
         # Fetch the whole open list (all pages) so the cached copy is never partial.
         tasks = cast(Tasks, self._inner().get_tasks(tasklist_id, show_completed=False))
-        self._store.write_tasks(tasklist_id, tasks)
+        self._tasks_state[tasklist_id] = _saved(self._store.write_tasks(tasklist_id, tasks))
         self._fetched[tasklist_id] = tasks
-        self._served_at.pop(tasklist_id, None)
         return tasks
 
     def get_task(self, tasklist_id: str, task_id: str) -> "Task":

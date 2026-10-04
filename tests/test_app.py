@@ -102,8 +102,8 @@ def build_client(tmp_path: Path) -> Iterator[Mock]:
         patch("gtasks.app.CONFIG_FILE_PATH", tmp_path / "config.toml"),
     ):
         # Reads are live unless a test says otherwise (no "cached Xm ago" note).
-        build_client.return_value.tasks_fetched_at.return_value = None
-        build_client.return_value.tasklists_fetched_at.return_value = None
+        build_client.return_value.tasks_cache_state.return_value = None
+        build_client.return_value.tasklists_cache_state.return_value = None
         yield build_client
 
 
@@ -163,7 +163,7 @@ class TestMainClientConstruction:
         build_client.return_value.get_tasklists.return_value = []
         build_client.return_value.get_tasklist.return_value = {"id": "d", "title": "My Tasks"}
         build_client.return_value.get_tasks.return_value = []
-        build_client.return_value.tasks_fetched_at.return_value = None
+        build_client.return_value.tasks_cache_state.return_value = None
 
         assert main(argv) == 0
         assert build_client.call_args.kwargs["fresh"] is True

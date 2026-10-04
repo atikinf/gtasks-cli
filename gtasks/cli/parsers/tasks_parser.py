@@ -27,13 +27,12 @@ def cmd_list_tasks(args: argparse.Namespace, get_client: "ClientProvider", cfg: 
     truncated = args.limit is not None and len(tasks) > args.limit
     tasks = tasks[: args.limit] if truncated else tasks
 
-    fetched_at = client.tasks_fetched_at(target.id)
     ui.render_tasks(
         tasks,
         heading=target.title,
         show_ids=args.show_ids,
         truncated=truncated,
-        cached_age=ui.cached_age(fetched_at),
+        cache=client.tasks_cache_state(target.id),
     )
     ListingState.default().save(target.id, tasks)
 

@@ -1,13 +1,16 @@
 from collections.abc import Iterator
 from datetime import date
 from io import StringIO
+from unittest.mock import patch
 
 import pytest
 from rich.console import Console
 
 from gtasks.cli import ui
+from gtasks.client.protocol import CacheState
 
-TODAY = date(2026, 10, 2)  # a Friday
+TODAY = date(2026, 10, 2)
+NOW = 1_000_000.0  # a Friday
 
 
 def _console(**kwargs) -> Console:
@@ -76,18 +79,33 @@ class TestRenderTasks:
         assert "gtasks tasks" in output
 
     @pytest.mark.parametrize(
-        "age, note",
-        [(None, None), (59, None), (60, "cached 1m ago"), (12 * 60 + 30, "cached 12m ago")],
-        ids=["live", "under-a-minute", "one-minute", "twelve-minutes"],
+        "cache, note",
+        [
+            (None, None),
+            (CacheState(from_cache=False, fetched_at=NOW), "cache refreshed"),
+            (CacheState(from_cache=True, fetched_at=NOW), "cached just now"),
+            (CacheState(from_cache=True, fetched_at=NOW - 59), "cached just now"),
+            (CacheState(from_cache=True, fetched_at=NOW - 60), "cached 1m ago"),
+            (CacheState(from_cache=True, fetched_at=NOW - 750), "cached 12m ago"),
+        ],
+        ids=[
+            "no-cache",
+            "refreshed",
+            "zero-seconds",
+            "under-a-minute",
+            "one-minute",
+            "twelve-minutes",
+        ],
     )
-    def test_render_tasks_GIVEN_cached_age_THEN_note_only_from_a_minute(
-        self, consoles: tuple[Console, Console], age: float | None, note: str | None
+    def test_render_tasks_GIVEN_cache_state_THEN_heading_says_so(
+        self, consoles: tuple[Console, Console], cache: CacheState | None, note: str | None
     ) -> None:
-        ui.render_tasks([], heading="Groceries", cached_age=age, today=TODAY)
+        with patch("gtasks.cli.ui.time.time", return_value=NOW):
+            ui.render_tasks([], heading="Groceries", cache=cache, today=TODAY)
 
         heading = _text(consoles[0]).splitlines()[0]
         if note is None:
-            assert "cached" not in heading
+            assert heading.strip() == "Groceries · 0 open"
         else:
             assert heading.endswith(f"Groceries · 0 open · {note}")
 
@@ -166,20 +184,23 @@ class TestRenderTasklists:
         assert f"{ui.ACTIVE_MARK} Home" in lines[1]
 
     @pytest.mark.parametrize(
-        "age, heading",
+        "cache, heading",
         [
             (None, "Task lists · 2"),
-            (59, "Task lists · 2"),
-            (12 * 60, "Task lists · 2 · cached 12m ago"),
+            (CacheState(from_cache=False, fetched_at=NOW), "Task lists · 2 · cache refreshed"),
+            (CacheState(from_cache=True, fetched_at=NOW), "Task lists · 2 · cached just now"),
+            (CacheState(from_cache=True, fetched_at=NOW - 59), "Task lists · 2 · cached just now"),
+            (CacheState(from_cache=True, fetched_at=NOW - 720), "Task lists · 2 · cached 12m ago"),
         ],
-        ids=["live", "under-a-minute", "cached"],
+        ids=["no-cache", "refreshed", "zero-seconds", "under-a-minute", "cached"],
     )
-    def test_render_tasklists_GIVEN_heading_THEN_count_and_cache_age(
-        self, consoles: tuple[Console, Console], age: float | None, heading: str
+    def test_render_tasklists_GIVEN_heading_THEN_count_and_cache_state(
+        self, consoles: tuple[Console, Console], cache: CacheState | None, heading: str
     ) -> None:
         tasklists = [{"id": "l1", "title": "Work"}, {"id": "l2", "title": "Home"}]
 
-        ui.render_tasklists(tasklists, heading="Task lists", cached_age=age)
+        with patch("gtasks.cli.ui.time.time", return_value=NOW):
+            ui.render_tasklists(tasklists, heading="Task lists", cache=cache)
 
         assert _text(consoles[0]).splitlines()[0].strip() == heading
 

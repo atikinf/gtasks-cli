@@ -17,6 +17,7 @@ from gtasks.cli.parsers.done_parser import cmd_done
 from gtasks.cli.parsers.lists_parser import cmd_list_tasklists
 from gtasks.cli.parsers.tasks_parser import cmd_list_tasks
 from gtasks.cli.parsers.use_parser import cmd_use
+from gtasks.client.protocol import CacheState
 from gtasks.utils.config import Config, ConfigKey
 from gtasks.utils.listing_state import ListingState
 
@@ -35,8 +36,8 @@ def config(tmp_path: Path) -> Config:
 def mock_client() -> Mock:
     """Provide a mocked API client whose reads are always live (never from a cache)."""
     client = Mock()
-    client.tasks_fetched_at.return_value = None
-    client.tasklists_fetched_at.return_value = None
+    client.tasks_cache_state.return_value = None
+    client.tasklists_cache_state.return_value = None
     return client
 
 
@@ -421,13 +422,23 @@ class TestCmdListTasks:
         self, mock_client: Mock, active_config: Config, base_args: dict, capsys: CaptureFixture
     ) -> None:
         mock_client.get_tasks.return_value = self.SAMPLE_TASKS
-        mock_client.tasks_fetched_at.return_value = 1_000_000.0
+        mock_client.tasks_cache_state.return_value = CacheState(True, 1_000_000.0)
 
         with patch("gtasks.cli.ui.time.time", return_value=1_000_000.0 + 300):
             cmd_list_tasks(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
 
-        mock_client.tasks_fetched_at.assert_called_once_with("list1")
+        mock_client.tasks_cache_state.assert_called_once_with("list1")
         assert "Work · 3 open · cached 5m ago" in capsys.readouterr().out
+
+    def test_cmd_list_tasks_GIVEN_data_just_saved_to_cache_THEN_heading_says_refreshed(
+        self, mock_client: Mock, active_config: Config, base_args: dict, capsys: CaptureFixture
+    ) -> None:
+        mock_client.get_tasks.return_value = self.SAMPLE_TASKS
+        mock_client.tasks_cache_state.return_value = CacheState(False, 1_000_000.0)
+
+        cmd_list_tasks(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
+
+        assert "Work · 3 open · cache refreshed" in capsys.readouterr().out
 
     def test_cmd_list_tasks_GIVEN_nothing_set_THEN_uses_account_default(
         self, mock_client: Mock, config: Config, base_args: dict, capsys: CaptureFixture
@@ -533,7 +544,7 @@ class TestCmdListTasklists:
         self, mock_client: Mock, config: Config, base_args: dict, capsys: CaptureFixture
     ) -> None:
         mock_client.get_tasklists.return_value = self.SAMPLE_TASKLISTS
-        mock_client.tasklists_fetched_at.return_value = 1_000_000.0
+        mock_client.tasklists_cache_state.return_value = CacheState(True, 1_000_000.0)
 
         with patch("gtasks.cli.ui.time.time", return_value=1_000_000.0 + 600):
             cmd_list_tasklists(argparse.Namespace(**base_args), lambda **_: mock_client, config)
