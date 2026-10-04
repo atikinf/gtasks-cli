@@ -67,20 +67,6 @@ class TestGetConfig:
         assert manager.get(ConfigKey.ACTIVE_TASKLIST_TITLE) == "PreExisting"
 
 
-class TestGetAll:
-    def test_get_all_GIVEN_no_values_set_THEN_all_none(self, manager: Config) -> None:
-        result = manager.get_all()
-
-        assert result == {key: None for key in ConfigKey}
-
-    def test_get_all_GIVEN_value_set_THEN_returns_it(self, manager: Config) -> None:
-        manager.set(ConfigKey.ACTIVE_TASKLIST_TITLE, LIST_TITLE)
-
-        result = manager.get_all()
-
-        assert result[ConfigKey.ACTIVE_TASKLIST_TITLE] == LIST_TITLE
-
-
 class TestRawKeys:
     def test_get_raw_GIVEN_legacy_key_on_disk_THEN_returns_it(self, config_path: Path) -> None:
         config_path.write_text("[DEFAULT]\ndefault_tasklist = Old\n")

@@ -19,14 +19,22 @@ def _http_error(status: int) -> HttpError:
 
 
 @pytest.fixture
-def mock_client(tmp_path: Path) -> Iterator[Mock]:
-    """Patch out credentials and point config at a temp dir; yields the client main() gets."""
-    client = Mock()
+def build_client(tmp_path: Path) -> Iterator[Mock]:
+    """Patch out sign-in entirely; yields the factory main() would call."""
     with (
-        patch("gtasks.app.build_client", return_value=client),
+        patch("gtasks.app.build_client") as build_client,
         patch("gtasks.app.CONFIG_FILE_PATH", tmp_path / "config.toml"),
     ):
-        yield client
+        # Reads are live unless a test says otherwise (no "cached Xm ago" note).
+        build_client.return_value.tasks_cache_state.return_value = None
+        build_client.return_value.tasklists_cache_state.return_value = None
+        yield build_client
+
+
+@pytest.fixture
+def mock_client(build_client: Mock) -> Mock:
+    """The client main() gets."""
+    return build_client.return_value
 
 
 class TestMainErrorRouting:
@@ -92,19 +100,6 @@ class TestMainErrorRouting:
 
         assert code == 1
         assert capsys.readouterr().err.startswith("error: credentials.json")
-
-
-@pytest.fixture
-def build_client(tmp_path: Path) -> Iterator[Mock]:
-    """Patch out sign-in entirely; yields the factory main() would call."""
-    with (
-        patch("gtasks.app.build_client") as build_client,
-        patch("gtasks.app.CONFIG_FILE_PATH", tmp_path / "config.toml"),
-    ):
-        # Reads are live unless a test says otherwise (no "cached Xm ago" note).
-        build_client.return_value.tasks_cache_state.return_value = None
-        build_client.return_value.tasklists_cache_state.return_value = None
-        yield build_client
 
 
 class TestMainClientConstruction:

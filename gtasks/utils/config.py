@@ -45,9 +45,6 @@ class Config:
         self._parser[section][key.value] = value
         self._save()
 
-    def get_all(self, section: str = DEFAULT_SECTION) -> dict[ConfigKey, str | None]:
-        return {key: self.get(key, section) for key in ConfigKey}
-
     def get_raw(self, name: str, section: str = DEFAULT_SECTION) -> str | None:
         """Read a key that isn't (or is no longer) a ConfigKey."""
         if section not in self._parser:

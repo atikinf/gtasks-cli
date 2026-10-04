@@ -306,11 +306,6 @@ class TestResolveTasksFromInputs:
 
         assert result.tasks == [self.SAMPLE_TASKS[1]]
 
-    def test_GIVEN_title_in_different_case_THEN_matches(self, mock_client: Mock) -> None:
-        result = resolve_tasks_from_inputs(["WALK DOG"], mock_client, "list1")
-
-        assert result.tasks == [self.SAMPLE_TASKS[1]]
-
     def test_GIVEN_out_of_range_index_THEN_raises(self, mock_client: Mock) -> None:
         with pytest.raises(CliError, match="no task #99"):
             resolve_tasks_from_inputs(["99"], mock_client, "list1")

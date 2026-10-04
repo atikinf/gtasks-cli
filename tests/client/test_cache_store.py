@@ -1,5 +1,4 @@
 import json
-import stat
 from pathlib import Path
 from unittest.mock import patch
 
@@ -189,31 +188,7 @@ class TestTasklists:
 
 
 class TestSchema:
-    @pytest.mark.parametrize(
-        "version, readable",
-        [
-            (SCHEMA_VERSION, True),
-            ("1.7.0", True),
-            ("2.0.0", False),
-            ("0.9.0", False),
-            ("garbage", False),
-            (None, False),
-            (1, False),
-        ],
-        ids=["current", "newer-minor", "newer-major", "older-major", "malformed", "missing",
-             "not-a-string"],
-    )
-    def test_read_GIVEN_schema_version_THEN_only_same_major_readable(
-        self, store: CacheStore, root: Path, version: object, readable: bool
-    ) -> None:
-        store.write_tasks("list1", TASKS)
-        path = _only_tasks_file(root)
-        doc = json.loads(path.read_text())
-        doc["schema"] = version
-        doc["added_in_newer_minor"] = {"ignored": True}
-        path.write_text(json.dumps(doc))
-
-        assert (store.read_tasks("list1") is not None) is readable
+    """Schema rules themselves are tested in tests/utils/test_json_files.py."""
 
     def test_write_GIVEN_incompatible_file_THEN_overwrites_with_current_schema(
         self, store: CacheStore, root: Path
@@ -231,11 +206,11 @@ class TestSchema:
 
 
 class TestRobustness:
+    """Store-specific shapes; generic file failures are tested in test_json_files.py."""
+
     @pytest.mark.parametrize(
         "content",
         [
-            "{not json",
-            "[]",
             json.dumps({"schema": SCHEMA_VERSION, "tasklist_id": "list1", "fetched_at": T0,
                         "tasks": "not a list"}),
             json.dumps({"schema": SCHEMA_VERSION, "tasklist_id": "list1", "fetched_at": T0,
@@ -245,8 +220,7 @@ class TestRobustness:
             json.dumps({"schema": SCHEMA_VERSION, "tasklist_id": "list1", "fetched_at": True,
                         "tasks": []}),
         ],
-        ids=["bad-json", "not-an-object", "tasks-not-list", "task-not-dict", "time-not-number",
-             "time-is-bool"],
+        ids=["tasks-not-list", "task-not-dict", "time-not-number", "time-is-bool"],
     )
     def test_read_tasks_GIVEN_corrupt_file_THEN_miss(
         self, store: CacheStore, root: Path, content: str
@@ -255,58 +229,6 @@ class TestRobustness:
         _only_tasks_file(root).write_text(content)
 
         assert store.read_tasks("list1") is None
-
-    def test_read_tasks_GIVEN_unreadable_file_THEN_miss(
-        self, store: CacheStore, root: Path
-    ) -> None:
-        store.write_tasks("list1", TASKS)
-        path = _only_tasks_file(root)
-        path.unlink()
-        path.mkdir()  # reading a directory raises IsADirectoryError, an OSError
-
-        assert store.read_tasks("list1") is None
-
-    def test_write_GIVEN_cache_path_blocked_by_a_file_THEN_silently_skipped(
-        self, store: CacheStore, root: Path
-    ) -> None:
-        root.parent.mkdir(parents=True, exist_ok=True)
-        root.write_text("not a directory")
-
-        store.write_tasks("list1", TASKS)  # must not raise
-
-        assert store.read_tasks("list1") is None
-
-    def test_write_GIVEN_disk_full_THEN_silently_skipped(self, store: CacheStore) -> None:
-        with patch(
-            "gtasks.utils.json_files.tempfile.mkstemp", side_effect=OSError(28, "No space")
-        ):
-            store.write_tasks("list1", TASKS)  # must not raise
-
-        assert store.read_tasks("list1") is None
-
-    def test_write_GIVEN_failure_after_temp_file_created_THEN_temp_file_removed(
-        self, store: CacheStore, root: Path
-    ) -> None:
-        with patch("gtasks.utils.json_files.os.replace", side_effect=OSError("boom")):
-            store.write_tasks("list1", TASKS)
-
-        assert list((root / "acct" / "lists").iterdir()) == []
-
-    def test_write_THEN_leaves_no_temp_files(self, store: CacheStore, root: Path) -> None:
-        store.write_tasks("list1", TASKS)
-        store.write_tasks("list1", TASKS[:1])
-
-        assert [p.name for p in (root / "acct" / "lists").iterdir()] == [
-            _only_tasks_file(root).name
-        ]
-
-    def test_write_THEN_owner_only_permissions(self, store: CacheStore, root: Path) -> None:
-        store.write_tasks("list1", TASKS)
-
-        for directory in (root, root / "acct", root / "acct" / "lists"):
-            assert stat.S_IMODE(directory.stat().st_mode) == 0o700
-        assert stat.S_IMODE(_only_tasks_file(root).stat().st_mode) == 0o600
-
 
 class TestAccounts:
     def test_account_key_GIVEN_different_sign_ins_THEN_different_keys(self) -> None:

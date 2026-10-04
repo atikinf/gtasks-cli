@@ -1,5 +1,4 @@
 import json
-import stat
 from pathlib import Path
 
 import pytest
@@ -72,7 +71,7 @@ class TestLocation:
 
 
 class TestFileConventions:
-    """Same conventions as the cache: see utils/json_files.py."""
+    """Listing-specific checks; the shared conventions are tested in test_json_files.py."""
 
     def test_save_THEN_schema_versioned(self, state: ListingState, root: Path) -> None:
         state.save("list1", TASKS)
@@ -80,31 +79,14 @@ class TestFileConventions:
         assert json.loads((root / LISTING_FILE_NAME).read_text())["schema"] == SCHEMA_VERSION
 
     @pytest.mark.parametrize(
-        "schema, readable",
-        [("1.4.0", True), ("2.0.0", False), (None, False)],
-        ids=["newer-minor", "newer-major", "missing"],
-    )
-    def test_rows_GIVEN_schema_THEN_only_same_major_readable(
-        self, state: ListingState, root: Path, schema: object, readable: bool
-    ) -> None:
-        state.save("list1", TASKS)
-        path = root / LISTING_FILE_NAME
-        doc = json.loads(path.read_text())
-        doc["schema"] = schema
-        path.write_text(json.dumps(doc))
-
-        assert (state.rows("list1") is not None) is readable
-
-    @pytest.mark.parametrize(
         "content",
         [
-            "{not json",
             json.dumps({"schema": SCHEMA_VERSION, "tasklist_id": "list1", "rows": "nope"}),
             json.dumps(
                 {"schema": SCHEMA_VERSION, "tasklist_id": "list1", "rows": [{"title": "x"}]}
             ),
         ],
-        ids=["bad-json", "rows-not-list", "row-without-id"],
+        ids=["rows-not-list", "row-without-id"],
     )
     def test_rows_and_consume_GIVEN_corrupt_file_THEN_treated_as_no_listing(
         self, state: ListingState, root: Path, content: str
@@ -123,9 +105,3 @@ class TestFileConventions:
         ListingState(blocked).save("list1", TASKS)  # must not raise
 
         assert ListingState(blocked).rows("list1") is None
-
-    def test_save_THEN_owner_only_permissions(self, state: ListingState, root: Path) -> None:
-        state.save("list1", TASKS)
-
-        assert stat.S_IMODE(root.stat().st_mode) == 0o700
-        assert stat.S_IMODE((root / LISTING_FILE_NAME).stat().st_mode) == 0o600

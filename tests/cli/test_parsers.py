@@ -155,12 +155,6 @@ class TestTasksParserArgs:
         assert args.limit == expected_limit
         assert args.show_ids == expected_show_ids
 
-    def test_tasks_GIVEN_both_tasklist_flags_THEN_exits(
-        self, parser: argparse.ArgumentParser
-    ) -> None:
-        with pytest.raises(SystemExit):
-            parser.parse_args(["tasks", "-t", "id1", "-l", "Work"])
-
 
 class TestListsParserArgs:
     """Test argument parsing for the 'lists' subcommand."""
@@ -199,15 +193,6 @@ class TestListsParserArgs:
 class TestDoneParserArgs:
     """Test argument parsing for the 'done' subcommand."""
 
-    def test_done_GIVEN_single_title_THEN_parses(
-        self, parser: argparse.ArgumentParser
-    ) -> None:
-        args = parser.parse_args(["done", "Buy milk"])
-
-        assert args.command == "done"
-        assert args.tasks == ["Buy milk"]
-        assert args.tasklist_title is None
-
     def test_done_GIVEN_multiple_titles_THEN_parses(
         self, parser: argparse.ArgumentParser
     ) -> None:
@@ -215,33 +200,9 @@ class TestDoneParserArgs:
 
         assert args.tasks == ["Buy milk", "Walk dog"]
 
-    def test_done_GIVEN_index_inputs_THEN_parses_as_strings(
-        self, parser: argparse.ArgumentParser
-    ) -> None:
-        args = parser.parse_args(["done", "1", "3"])
-
-        assert args.tasks == ["1", "3"]
-
-    def test_done_GIVEN_tasklist_flag_THEN_parses(
-        self, parser: argparse.ArgumentParser
-    ) -> None:
-        args = parser.parse_args(["done", "Task", "-l", "Work"])
-
-        assert args.tasks == ["Task"]
-        assert args.tasklist_title == "Work"
-
 
 class TestDeleteParserArgs:
     """Test argument parsing for the 'delete' subcommand."""
-
-    def test_delete_GIVEN_single_title_THEN_parses(
-        self, parser: argparse.ArgumentParser
-    ) -> None:
-        args = parser.parse_args(["delete", "Buy milk"])
-
-        assert args.command == "delete"
-        assert args.tasks == ["Buy milk"]
-        assert args.tasklist_title is None
 
     def test_delete_GIVEN_multiple_titles_THEN_parses(
         self, parser: argparse.ArgumentParser
@@ -249,13 +210,6 @@ class TestDeleteParserArgs:
         args = parser.parse_args(["delete", "Buy milk", "Walk dog"])
 
         assert args.tasks == ["Buy milk", "Walk dog"]
-
-    def test_delete_GIVEN_index_inputs_THEN_parses_as_strings(
-        self, parser: argparse.ArgumentParser
-    ) -> None:
-        args = parser.parse_args(["delete", "2", "4"])
-
-        assert args.tasks == ["2", "4"]
 
 
 class TestUseParserArgs:

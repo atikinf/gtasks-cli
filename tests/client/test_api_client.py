@@ -17,7 +17,6 @@ def api_client(service: MagicMock) -> ApiClient:
 
 
 class TestGetTasklists:
-    MAX_TASKLISTS = 3
     PAGE1_ITEMS = [{"id": "list1", "title": "My Tasks"}]
     PAGE2_ITEMS = [{"id": "list2", "title": "Work"}]
     PAGE3_ITEMS = [{"id": "list3", "title": "Personal"}]
@@ -101,7 +100,6 @@ class TestGetTasks:
         "showDeleted": False,
         "showAssigned": False,
     }
-    MAX_TASKS = 3
     PAGE1_ITEMS = [{"id": "task1", "title": "Buy groceries"}]
     PAGE2_ITEMS = [{"id": "task2", "title": "Call mom"}]
     PAGE3_ITEMS = [{"id": "task3", "title": "Exercise"}]
