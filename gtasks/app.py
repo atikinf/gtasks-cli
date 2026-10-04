@@ -5,9 +5,6 @@ import sys
 from functools import cache
 from typing import TYPE_CHECKING
 
-from google.auth.exceptions import RefreshError
-from googleapiclient.errors import HttpError
-
 from gtasks import defaults
 from gtasks.cli import ui
 from gtasks.cli.cli import build_parser
@@ -17,10 +14,12 @@ from gtasks.defaults import CONFIG_FILE_PATH
 from gtasks.utils.config import Config, ConfigKey
 
 if TYPE_CHECKING:
+    from googleapiclient.errors import HttpError
+
     from gtasks.client.protocol import TasksClient
 
 
-def _report_signed_out(e: SignInRequiredError | RefreshError | HttpError) -> None:
+def _report_signed_out(e: Exception) -> None:
     """Every way of being signed out ends in the same pointer to `gtasks auth`."""
     if isinstance(e, SignInRequiredError):
         message = "You're not signed in to Google Tasks."
@@ -29,7 +28,7 @@ def _report_signed_out(e: SignInRequiredError | RefreshError | HttpError) -> Non
     ui.error(message, hint="Run `gtasks auth` to sign in.")
 
 
-def _report_http_error(e: HttpError) -> None:
+def _report_http_error(e: "HttpError") -> None:
     if e.resp.status == 401:
         _report_signed_out(e)
     elif e.resp.status == 404:
@@ -40,6 +39,24 @@ def _report_http_error(e: HttpError) -> None:
         )
     else:
         ui.error(f"Google Tasks API error ({e.resp.status}): {e.reason}")
+
+
+def _report_error(e: Exception) -> None:
+    """Explain an error that isn't a CliError.
+
+    Google's error types are imported here rather than at module level: only a failing
+    command pays for them, and a command served from the cache never imports them at all.
+    """
+    from google.auth.exceptions import RefreshError
+    from googleapiclient.errors import HttpError
+
+    if isinstance(e, (SignInRequiredError, RefreshError)):
+        # Raised when the client is built, or mid-request if the sign-in was revoked.
+        _report_signed_out(e)
+    elif isinstance(e, HttpError):
+        _report_http_error(e)
+    else:
+        ui.error(str(e))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -71,20 +88,10 @@ def main(argv: list[str] | None = None) -> int:
     except ExceptionGroup as eg:
         # Batch mutations (done/delete) collect one exception per failed task.
         for sub in eg.exceptions:
-            if isinstance(sub, HttpError):
-                _report_http_error(sub)
-            else:
-                ui.error(str(sub))
-        return 1
-    except (SignInRequiredError, RefreshError) as e:
-        # Raised when the client is built, or mid-request if the sign-in was revoked.
-        _report_signed_out(e)
-        return 1
-    except HttpError as e:
-        _report_http_error(e)
+            _report_error(sub)
         return 1
     except Exception as e:
-        ui.error(str(e))
+        _report_error(e)
         return 1
 
 

@@ -52,7 +52,7 @@ def refresher() -> MagicMock:
 
 @pytest.fixture
 def client(inner: MagicMock, store: CacheStore, refresher: MagicMock) -> CachingClient:
-    return CachingClient(inner, store, make_refresher=lambda: refresher)
+    return CachingClient(store, make_inner=lambda: inner, make_refresher=lambda: refresher)
 
 
 def _cached(store: CacheStore, tasklist_id: str = "l1") -> list | None:
@@ -65,7 +65,7 @@ class TestTasklistReads:
         self, client: CachingClient, inner: MagicMock, store: CacheStore
     ) -> None:
         client.get_tasklists()
-        result = CachingClient(inner, store).get_tasklists()
+        result = CachingClient(store, make_inner=lambda: inner).get_tasklists()
 
         assert result == LISTS
         inner.get_tasklists.assert_called_once_with()
@@ -94,11 +94,11 @@ class TestTasklistReads:
         assert client.tasklists_fetched_at() is None  # fetched live
 
         clock.t += 600
-        later = CachingClient(inner, store)
+        later = CachingClient(store, make_inner=lambda: inner)
         later.get_tasklists()
         assert later.tasklists_fetched_at() == T0
 
-        fresh = CachingClient(inner, store, fresh=True)
+        fresh = CachingClient(store, make_inner=lambda: inner, fresh=True)
         fresh.get_tasklists()
         assert fresh.tasklists_fetched_at() is None
 
@@ -117,7 +117,7 @@ class TestTasklistReads:
         inner.get_tasklist.return_value = LISTS[0]
 
         first = client.get_tasklist("@default")
-        second = CachingClient(inner, store).get_tasklist("@default")
+        second = CachingClient(store, make_inner=lambda: inner).get_tasklist("@default")
 
         assert first == second == LISTS[0]
         inner.get_tasklist.assert_called_once_with("@default")
@@ -139,7 +139,10 @@ class TestTaskReads:
         self, client: CachingClient, inner: MagicMock, store: CacheStore
     ) -> None:
         client.get_tasks("l1", show_completed=False)
-        result = CachingClient(inner, store).get_tasks("l1", show_completed=False)
+        result = CachingClient(
+            store,
+            make_inner=lambda: inner,
+        ).get_tasks("l1", show_completed=False)
 
         assert result == OPEN
         inner.get_tasks.assert_called_once_with("l1", show_completed=False)
@@ -184,7 +187,7 @@ class TestTaskReads:
         assert client.tasks_fetched_at("l1") is None  # fetched live
 
         clock.t += 600
-        later = CachingClient(inner, store)
+        later = CachingClient(store, make_inner=lambda: inner)
         later.get_tasks("l1", show_completed=False)
 
         assert later.tasks_fetched_at("l1") == T0
@@ -202,11 +205,15 @@ class TestFreshMode:
     def test_fresh_GIVEN_cached_data_THEN_refetches_and_stores(
         self, inner: MagicMock, store: CacheStore, clock: Clock
     ) -> None:
-        CachingClient(inner, store).get_tasks("l1", show_completed=False)
+        CachingClient(store, make_inner=lambda: inner).get_tasks("l1", show_completed=False)
         inner.get_tasks.return_value = OPEN[:1]
         clock.t += 60
 
-        result = CachingClient(inner, store, fresh=True).get_tasks("l1", show_completed=False)
+        result = CachingClient(
+            store,
+            make_inner=lambda: inner,
+            fresh=True,
+        ).get_tasks("l1", show_completed=False)
 
         assert result == OPEN[:1]
         assert store.read_tasks("l1") == (OPEN[:1], T0 + 60)
@@ -214,8 +221,8 @@ class TestFreshMode:
     def test_fresh_GIVEN_cached_lists_THEN_refetches_lists_too(
         self, inner: MagicMock, store: CacheStore
     ) -> None:
-        CachingClient(inner, store).get_tasklists()
-        CachingClient(inner, store, fresh=True).get_tasklists()
+        CachingClient(store, make_inner=lambda: inner).get_tasklists()
+        CachingClient(store, make_inner=lambda: inner, fresh=True).get_tasklists()
 
         assert inner.get_tasklists.call_count == 2
 
@@ -335,7 +342,7 @@ class TestTaskWrites:
         store.write_tasks("l1", OPEN)
         clock.t += 600
 
-        CachingClient(inner, store).complete_tasks("l1", ["t1"])
+        CachingClient(store, make_inner=lambda: inner).complete_tasks("l1", ["t1"])
 
         assert store.read_tasks("l1") == ([OPEN[1]], T0)
 
@@ -356,14 +363,57 @@ class TestTaskWrites:
         refresher.get_tasks.side_effect = refetch
         inner.complete_tasks.side_effect = complete
 
-        CachingClient(inner, store, make_refresher=lambda: refresher).complete_tasks("l1", ["t1"])
+        CachingClient(
+            store,
+            make_inner=lambda: inner,
+            make_refresher=lambda: refresher,
+        ).complete_tasks("l1", ["t1"])
 
         assert _cached(store) == ["t2"]
+
+    def test_write_THEN_main_client_built_on_main_thread_before_refetch_starts(
+        self, inner: MagicMock, refresher: MagicMock, store: CacheStore
+    ) -> None:
+        """Building the main client loads credentials; doing that before the refetch thread
+        exists means the two can never race to load or refresh them."""
+        events: list[tuple[str, str]] = []
+
+        def make_inner() -> MagicMock:
+            events.append(("inner", threading.current_thread().name))
+            return inner
+
+        def make_refresher() -> MagicMock:
+            events.append(("refresher", threading.current_thread().name))
+            return refresher
+
+        CachingClient(store, make_inner=make_inner, make_refresher=make_refresher).delete_tasks(
+            "l1", ["t1"]
+        )
+
+        assert events[0] == ("inner", threading.main_thread().name)
+        assert [name for name, _ in events] == ["inner", "refresher"]
+
+    def test_reads_GIVEN_cache_hit_THEN_main_client_never_built(
+        self, inner: MagicMock, store: CacheStore
+    ) -> None:
+        store.write_tasklists(LISTS)
+        store.write_tasks("l1", OPEN)
+        make_inner = MagicMock(return_value=inner)
+        client = CachingClient(store, make_inner=make_inner)
+
+        client.get_tasklists()
+        client.get_tasks("l1", show_completed=False)
+
+        make_inner.assert_not_called()
 
     def test_write_THEN_refetch_uses_its_own_client(
         self, inner: MagicMock, refresher: MagicMock, store: CacheStore
     ) -> None:
-        CachingClient(inner, store, make_refresher=lambda: refresher).delete_tasks("l1", ["t1"])
+        CachingClient(
+            store,
+            make_inner=lambda: inner,
+            make_refresher=lambda: refresher,
+        ).delete_tasks("l1", ["t1"])
 
         inner.get_tasks.assert_not_called()  # the main client is never shared across threads
         refresher.get_tasks.assert_called_once()

@@ -152,6 +152,11 @@ override in `tests/conftest.py` keeps every test off the real `~/.cache`.
 
 - Google API types (`Task`, `TaskList`, `TasksResource`) come from `google-api-python-client-stubs`
   and are imported under `if TYPE_CHECKING:` only — they do not exist at runtime.
+- Heavy libraries (the Google API/auth packages, `httplib2`, `dateparser`; ~0.6 s together) are
+  imported inside the functions that use them, never at module level, so a command served from
+  the cache doesn't load them. `CachingClient` likewise builds the real client (`make_inner`)
+  only on first use. `tests/test_startup.py` guards this in a subprocess. In tests, patch these
+  names at their source module (e.g. `google_auth_oauthlib.flow.InstalledAppFlow`).
 - `TasksClient` (`client/protocol.py`) is a `Protocol`, not an ABC — deliberately, so plain
   `Mock()`/`MagicMock()` test doubles satisfy it with no `spec=` or subclassing.
 - ruff: line-length 100, rules `E,F,I,W`, `gtasks` as first-party for isort.

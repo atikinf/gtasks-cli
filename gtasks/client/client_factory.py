@@ -1,17 +1,13 @@
-"""Factory functions for building API clients and services."""
+"""Factory functions for building API clients and services.
+
+The Google libraries are imported inside the functions that use them, never at module level:
+together they take ~0.4 s to import, and a command served from the cache never needs them.
+"""
 
 import pickle
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
-
-import httplib2
-from google.auth.exceptions import RefreshError
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_httplib2 import AuthorizedHttp
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
 
 from gtasks.client.api_client import ApiClient
 from gtasks.client.cache_store import CacheStore, account_key
@@ -20,6 +16,8 @@ from gtasks.client.protocol import TasksClient
 from gtasks.defaults import APP_CFG_PATH
 
 if TYPE_CHECKING:
+    from google.oauth2.credentials import Credentials
+    from google_auth_oauthlib.flow import InstalledAppFlow
     from googleapiclient._apis.tasks.v1.resources import TasksResource
 
 
@@ -46,8 +44,14 @@ def build_tasks_resource(creds: Credentials, timeout: float | None = None) -> "T
     Each resource owns a separate httplib2 connection, which isn't thread-safe: code running
     on another thread must build its own resource rather than share one.
     """
+    from googleapiclient.discovery import build
+
     if timeout is None:
         return build("tasks", "v1", credentials=creds)
+
+    import httplib2
+    from google_auth_httplib2 import AuthorizedHttp
+
     http = AuthorizedHttp(creds, http=httplib2.Http(timeout=timeout))
     # AuthorizedHttp is the documented way to pass credentials with a custom Http, but the
     # stubs only accept a plain httplib2.Http here.
@@ -67,14 +71,13 @@ def build_client(
     the main client and a concurrent refetch never race to refresh the same token.
     """
     creds: Credentials = auth_from_file(token_path, creds_path)
-    api = ApiClient(build_tasks_resource(creds))
     if cache_dir is None:
-        return api
+        return ApiClient(build_tasks_resource(creds))
 
     store = CacheStore(cache_dir, account_key(creds.client_id, creds.refresh_token))
     return CachingClient(
-        api,
         store,
+        make_inner=lambda: ApiClient(build_tasks_resource(creds)),
         fresh=fresh,
         make_refresher=lambda: ApiClient(
             build_tasks_resource(creds, timeout=_REFETCH_TIMEOUT_SECONDS)
@@ -91,6 +94,9 @@ def _load_or_refresh_creds(
     constructing a flow may require client secrets the caller would rather
     not gather (e.g. prompting the user) unless they're actually needed.
     """
+    from google.auth.exceptions import RefreshError
+    from google.auth.transport.requests import Request
+
     creds: Credentials | None = None
 
     if token_path.exists():
@@ -120,6 +126,8 @@ def _load_or_refresh_creds(
 
 def auth(token_path: Path, client_id: str, client_secret: str) -> Credentials:
     """Authenticate using an inline client ID/secret (used by `gtasks auth`)."""
+    from google_auth_oauthlib.flow import InstalledAppFlow
+
     return _load_or_refresh_creds(
         token_path,
         lambda: InstalledAppFlow.from_client_config(
@@ -142,6 +150,8 @@ def auth_from_file(token_path: Path, creds_path: Path) -> Credentials:
     """Authenticate using a `credentials.json` file (used by `build_client`)."""
 
     def build_flow() -> InstalledAppFlow:
+        from google_auth_oauthlib.flow import InstalledAppFlow
+
         try:
             return InstalledAppFlow.from_client_secrets_file(str(creds_path), SCOPES)
         except FileNotFoundError as e:

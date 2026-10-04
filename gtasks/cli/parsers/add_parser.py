@@ -3,8 +3,6 @@
 import argparse
 from typing import TYPE_CHECKING
 
-import dateparser
-
 from gtasks.cli import ui
 from gtasks.cli.cli_utils import add_refresh_option
 from gtasks.cli.errors import CliError
@@ -22,6 +20,8 @@ def parse_due_date(date_str: str) -> str:
     "monday" or "next week" resolve to upcoming dates rather than past ones.
     Always normalises to midnight UTC since the Tasks API ignores the time component.
     """
+    import dateparser  # ~0.2 s to import; only `add -d` needs it
+
     dt = dateparser.parse(
         date_str,
         settings={

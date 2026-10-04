@@ -80,7 +80,7 @@ class TestLoadCredentials:
         mock_pickle.dump.assert_called_once()
         assert result == expired_creds_with_refresh_token
 
-    @patch("gtasks.client.client_factory.InstalledAppFlow")
+    @patch("google_auth_oauthlib.flow.InstalledAppFlow")
     @patch("gtasks.client.client_factory.pickle")
     def test_load_credentials_GIVEN_no_cached_token_THEN_runs_oauth_flow(
         self,
@@ -109,7 +109,7 @@ class TestLoadCredentials:
         mock_pickle.dump.assert_called_once()
         assert result == new_creds
 
-    @patch("gtasks.client.client_factory.InstalledAppFlow")
+    @patch("google_auth_oauthlib.flow.InstalledAppFlow")
     @patch("gtasks.client.client_factory.pickle")
     def test_load_credentials_GIVEN_invalid_cached_creds_THEN_runs_oauth_flow(
         self,
@@ -190,7 +190,7 @@ class TestSignInRequired:
     def creds_path(self) -> Path:
         return Path("/fake/credentials.json")
 
-    @patch("gtasks.client.client_factory.InstalledAppFlow")
+    @patch("google_auth_oauthlib.flow.InstalledAppFlow")
     def test_auth_from_file_GIVEN_no_token_and_no_credentials_file_THEN_raises_sign_in_required(
         self, mock_flow_class: MagicMock, token_path: Path, creds_path: Path
     ) -> None:
@@ -202,7 +202,7 @@ class TestSignInRequired:
         ):
             auth_from_file(token_path, creds_path)
 
-    @patch("gtasks.client.client_factory.InstalledAppFlow")
+    @patch("google_auth_oauthlib.flow.InstalledAppFlow")
     @patch("gtasks.client.client_factory.pickle")
     def test_auth_from_file_GIVEN_refresh_fails_THEN_signs_in_again(
         self,
@@ -229,7 +229,7 @@ class TestSignInRequired:
         assert result == new_creds
         assert mock_pickle.dump.call_args.args[0] is new_creds  # the new sign-in is saved
 
-    @patch("gtasks.client.client_factory.InstalledAppFlow")
+    @patch("google_auth_oauthlib.flow.InstalledAppFlow")
     @patch("gtasks.client.client_factory.pickle")
     def test_auth_from_file_GIVEN_refresh_fails_and_no_credentials_file_THEN_sign_in_required(
         self,
@@ -258,6 +258,7 @@ class TestBuildClient:
 
     @pytest.fixture(autouse=True)
     def patched(self, creds: MagicMock):
+        self.creds = creds
         with (
             patch("gtasks.client.client_factory.auth_from_file", return_value=creds),
             patch("gtasks.client.client_factory.build_tasks_resource") as build_resource,
@@ -287,9 +288,20 @@ class TestBuildClient:
         refresher = client._make_refresher()  # what a concurrent refetch would use
 
         assert isinstance(refresher, ApiClient)
-        assert self.build_resource.call_args_list[0].kwargs == {}
-        assert self.build_resource.call_args_list[1].args == (creds,)
-        assert self.build_resource.call_args_list[1].kwargs["timeout"] > 0
+        self.build_resource.assert_called_once()
+        assert self.build_resource.call_args.args == (creds,)
+        assert self.build_resource.call_args.kwargs["timeout"] > 0
+
+    def test_build_client_GIVEN_cache_dir_THEN_api_client_built_only_when_needed(
+        self, tmp_path: Path
+    ) -> None:
+        """A command served from the cache never builds (or imports) the Google client."""
+        client = build_client(cache_dir=tmp_path)
+        self.build_resource.assert_not_called()
+
+        assert isinstance(client, CachingClient)
+        assert isinstance(client._inner(), ApiClient)
+        self.build_resource.assert_called_once_with(self.creds)
 
     def test_build_client_GIVEN_fresh_THEN_passed_to_caching_client(
         self, tmp_path: Path
@@ -301,7 +313,7 @@ class TestBuildClient:
 
 
 class TestBuildTasksResource:
-    @patch("gtasks.client.client_factory.build")
+    @patch("googleapiclient.discovery.build")
     def test_GIVEN_no_timeout_THEN_default_connection(self, mock_build: MagicMock) -> None:
         creds = MagicMock()
 
@@ -309,9 +321,9 @@ class TestBuildTasksResource:
 
         mock_build.assert_called_once_with("tasks", "v1", credentials=creds)
 
-    @patch("gtasks.client.client_factory.build")
-    @patch("gtasks.client.client_factory.httplib2.Http")
-    @patch("gtasks.client.client_factory.AuthorizedHttp")
+    @patch("googleapiclient.discovery.build")
+    @patch("httplib2.Http")
+    @patch("google_auth_httplib2.AuthorizedHttp")
     def test_GIVEN_timeout_THEN_new_connection_with_that_timeout(
         self, mock_authed: MagicMock, mock_http: MagicMock, mock_build: MagicMock
     ) -> None:

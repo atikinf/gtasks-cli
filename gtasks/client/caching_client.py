@@ -57,13 +57,16 @@ class _Refetch:
 class CachingClient:
     def __init__(
         self,
-        inner: "TasksClient",
         store: CacheStore,
         *,
+        make_inner: Callable[[], "TasksClient"],
         fresh: bool = False,
         make_refresher: Callable[[], "TasksClient"] | None = None,
     ) -> None:
-        self._inner = inner
+        # The real client is built on first use: a command served entirely from the cache
+        # never pays for building it (or importing the Google libraries behind it).
+        self._make_inner = make_inner
+        self._inner_client: "TasksClient | None" = None
         self._store = store
         self._fresh = fresh
         self._make_refresher = make_refresher
@@ -74,6 +77,11 @@ class CachingClient:
         # from the cache.
         self._served_at: dict[str, float] = {}
         self._tasklists_served_at: float | None = None
+
+    def _inner(self) -> "TasksClient":
+        if self._inner_client is None:
+            self._inner_client = self._make_inner()
+        return self._inner_client
 
     # --- Cache metadata --------------------------------------------------------------------
 
@@ -93,7 +101,7 @@ class CachingClient:
             items, self._tasklists_served_at = cached
         else:
             # Always fetch and store the full set; a limit is applied afterwards.
-            items = cast(Tasks, self._inner.get_tasklists())
+            items = cast(Tasks, self._inner().get_tasklists())
             self._store.write_tasklists(items)
             self._tasklists_served_at = None
         return cast("list[TaskList]", items[:max_results] if max_results is not None else items)
@@ -103,7 +111,7 @@ class CachingClient:
             cached = self._cached_tasklist(tasklist_id)
             if cached is not None:
                 return cached
-        tasklist = self._inner.get_tasklist(tasklist_id)
+        tasklist = self._inner().get_tasklist(tasklist_id)
         if tasklist_id == DEFAULT_TASKLIST_ID and tasklist.get("id"):
             self._store.write_default(cast(dict[str, Any], tasklist))
         return tasklist
@@ -119,15 +127,15 @@ class CachingClient:
 
     def add_tasklist(self, tasklist_title: str) -> "TaskList":
         with self._dropping(tasklists=True):
-            return self._inner.add_tasklist(tasklist_title)
+            return self._inner().add_tasklist(tasklist_title)
 
     def update_tasklist(self, tasklist_id: str, tasklist_title: str) -> "TaskList":
         with self._dropping(tasklists=True):
-            return self._inner.update_tasklist(tasklist_id, tasklist_title)
+            return self._inner().update_tasklist(tasklist_id, tasklist_title)
 
     def delete_tasklist(self, tasklist_id: str) -> None:
         with self._dropping(tasklist_id, tasklists=True):
-            self._inner.delete_tasklist(tasklist_id)
+            self._inner().delete_tasklist(tasklist_id)
 
     # --- Reading tasks ---------------------------------------------------------------------
 
@@ -165,7 +173,7 @@ class CachingClient:
             and not any(v for k, v in filters.items() if k != "show_completed")
         )
         if not canonical:
-            return self._inner.get_tasks(tasklist_id, max_results, **filters)
+            return self._inner().get_tasks(tasklist_id, max_results, **filters)
 
         tasks = self._read_open_tasks(tasklist_id)
         return cast("list[Task]", tasks[:max_results] if max_results is not None else tasks)
@@ -178,14 +186,14 @@ class CachingClient:
                 self._served_at[tasklist_id] = fetched_at
                 return tasks
         # Fetch the whole open list (all pages) so the cached copy is never partial.
-        tasks = cast(Tasks, self._inner.get_tasks(tasklist_id, show_completed=False))
+        tasks = cast(Tasks, self._inner().get_tasks(tasklist_id, show_completed=False))
         self._store.write_tasks(tasklist_id, tasks)
         self._fetched[tasklist_id] = tasks
         self._served_at.pop(tasklist_id, None)
         return tasks
 
     def get_task(self, tasklist_id: str, task_id: str) -> "Task":
-        return self._inner.get_task(tasklist_id, task_id)
+        return self._inner().get_task(tasklist_id, task_id)
 
     # --- Writing tasks ---------------------------------------------------------------------
 
@@ -199,7 +207,7 @@ class CachingClient:
         previous_task_id: str | None = None,
     ) -> "Task":
         def add() -> "Task":
-            return self._inner.add_task(
+            return self._inner().add_task(
                 tasklist_id, task_title, notes, due, parent_task_id, previous_task_id
             )
 
@@ -225,7 +233,7 @@ class CachingClient:
         status: Status | None = None,
     ) -> "Task":
         def update() -> "Task":
-            return self._inner.update_task(tasklist_id, task_id, task_title, notes, due, status)
+            return self._inner().update_task(tasklist_id, task_id, task_title, notes, due, status)
 
         def merge(task: "Task") -> Merge:
             def apply(tasks: Tasks) -> Tasks | None:
@@ -244,7 +252,7 @@ class CachingClient:
         done = set(task_ids)
         return self._write(
             tasklist_id,
-            lambda: self._inner.complete_tasks(tasklist_id, task_ids),
+            lambda: self._inner().complete_tasks(tasklist_id, task_ids),
             lambda _: lambda tasks: [t for t in tasks if t.get("id") not in done],
         )
 
@@ -263,13 +271,13 @@ class CachingClient:
 
         self._write(
             tasklist_id,
-            lambda: self._inner.delete_tasks(tasklist_id, task_ids),
+            lambda: self._inner().delete_tasks(tasklist_id, task_ids),
             lambda _: without_deleted,
         )
 
     def reopen_tasks(self, tasklist_id: str, task_ids: list[str]) -> "list[Task]":
         with self._dropping(tasklist_id):  # reopened tasks' positions are unknown
-            return self._inner.reopen_tasks(tasklist_id, task_ids)
+            return self._inner().reopen_tasks(tasklist_id, task_ids)
 
     def move_task(
         self,
@@ -281,13 +289,13 @@ class CachingClient:
     ) -> "Task":
         destination = [destination_tasklist_id] if destination_tasklist_id is not None else []
         with self._dropping(tasklist_id, *destination):
-            return self._inner.move_task(
+            return self._inner().move_task(
                 tasklist_id, task_id, parent_task_id, previous_task_id, destination_tasklist_id
             )
 
     def clear_completed_tasks(self, tasklist_id: str) -> None:
         with self._dropping(tasklist_id):
-            self._inner.clear_completed_tasks(tasklist_id)
+            self._inner().clear_completed_tasks(tasklist_id)
 
     # --- Internals -------------------------------------------------------------------------
 
@@ -295,6 +303,9 @@ class CachingClient:
         self, tasklist_id: str, mutate: Callable[[], R], merge_for: Callable[[R], Merge]
     ) -> R:
         """Run a task write, refetching the list alongside it, then merge the result in."""
+        # Build the main client (loading credentials) before the refetch thread starts, so
+        # the two never race to load or refresh the same credentials.
+        self._inner()
         base = self._fetched.get(tasklist_id)
         refetch = None
         if base is None and self._make_refresher is not None:
