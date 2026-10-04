@@ -9,18 +9,20 @@ The active list is stored by ID (with its title cached for display), so it survi
 and duplicate titles without a lookup on every command.
 
 Which tasks a command acts on: `resolve_tasks_from_inputs` takes titles or 1-based display
-numbers. Titles of both kinds match case-insensitively and prompt only when they collide.
+numbers. Titles of both kinds may be exact or a fragment (see `title_matching`): one match
+acts, several prompt, none suggests close spellings.
 """
 
 import argparse
 import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from gtasks.cli import ui
 from gtasks.cli.cli_utils import add_shared_option, prompt_index_choice
 from gtasks.cli.errors import Cancelled, CliError
+from gtasks.cli.title_matching import TitleMatch, match_titles
 from gtasks.client.protocol import DEFAULT_TASKLIST_ID
 from gtasks.utils.config import LEGACY_DEFAULT_TASKLIST_KEY, Config, ConfigKey
 from gtasks.utils.listing_state import ListingState
@@ -41,50 +43,50 @@ class TargetList:
     title: str
 
 
-# --- Shared title matching -------------------------------------------------------------
-
-
-def match_title[T: Mapping[str, Any]](items: list[T], title: str) -> list[T]:
-    """Return the items whose title matches `title`, ignoring case; items without an ID are
-    skipped, since there'd be nothing to act on."""
-    wanted = title.lower()
-    return [item for item in items if item.get("id") and item.get("title", "").lower() == wanted]
+# --- Shared choice ---------------------------------------------------------------------
 
 
 def _choose_one[T](
-    matches: list[T],
-    title: str,
+    match: TitleMatch[T],
+    query: str,
     *,
     noun: str,
     hint: str,
     render: Callable[..., None],
     input_fn: Callable[[str], str] | None,
 ) -> T:
-    """Pick one of `matches`, prompting only when the title is ambiguous."""
-    if not matches:
-        raise CliError(f"No {noun} named '{title}'.", hint=hint)
-    if len(matches) == 1:
-        return matches[0]
+    """Pick one matched item: act on a single match, prompt when several match, and explain
+    (with close spellings, if any) when none do."""
+    if match.kind == "none":
+        if match.suggestions:
+            # Keep the original hint too: for lists it's the fix when the cache is stale (a
+            # list created elsewhere), exactly when a near-miss suggestion is likely wrong.
+            suggested = " or ".join(f"'{s}'" for s in match.suggestions)
+            hint = f"Did you mean {suggested}? {hint}"
+        raise CliError(f"No {noun} named '{query}'.", hint=hint)
+    if len(match.matches) == 1:
+        return match.matches[0]
 
-    ui.info(f"Several {noun}s are named '{title}':")
-    render(matches, show_ids=True)
-    ix = prompt_index_choice(len(matches), "Which one?", input_fn or input)
+    how = "are named" if match.kind == "exact" else "match"
+    ui.info(f"Several {noun}s {how} '{query}':")
+    render(match.matches, show_ids=True)
+    ix = prompt_index_choice(len(match.matches), "Which one?", input_fn or input)
     if ix is None:
         raise Cancelled()
-    return matches[ix]
+    return match.matches[ix]
 
 
 # --- Task lists ------------------------------------------------------------------------
 
 
 def choose_tasklist(
-    matches: "list[TaskList]",
+    match: "TitleMatch[TaskList]",
     title: str,
     input_fn: Callable[[str], str] | None = None,
 ) -> "TaskList":
-    """Pick one list from title matches, prompting only when the title is ambiguous."""
+    """Pick one list from title matches, prompting only when several match."""
     return _choose_one(
-        matches,
+        match,
         title,
         noun="task list",
         # --refresh also updates the cached lists, so retrying the command then finds it.
@@ -95,8 +97,9 @@ def choose_tasklist(
 
 
 def find_tasklist(client: "TasksClient", title: str) -> "TaskList":
-    """Return the one list titled `title`; raises CliError if there's none."""
-    return choose_tasklist(match_title(client.get_tasklists(), title), title)
+    """Return the list `title` refers to: an exact title, or a fragment of one (switching lists
+    is reversible, so a unique partial match acts without asking). Raises CliError if none."""
+    return choose_tasklist(match_titles(client.get_tasklists(), title), title)
 
 
 def set_active_tasklist(cfg: Config, tasklist: "TaskList") -> None:
@@ -107,7 +110,9 @@ def set_active_tasklist(cfg: Config, tasklist: "TaskList") -> None:
 def add_tasklist_option(parser: argparse.ArgumentParser, *, top_level: bool = False) -> None:
     """Register -l/--list, so it reads the same on every list-scoped command (and before
     the subcommand: `gtasks -l Work`)."""
-    add_shared_option(
+    from gtasks.cli.completion import attach, complete_tasklists  # imports this module
+
+    action = add_shared_option(
         parser,
         "-l",
         "--list",
@@ -117,6 +122,7 @@ def add_tasklist_option(parser: argparse.ArgumentParser, *, top_level: bool = Fa
         metavar="LIST",
         help=f"task list to act on (default: ${ENV_VAR}, else the active list)",
     )
+    attach(action, complete_tasklists)
 
 
 def resolve_target_tasklist(
@@ -149,8 +155,9 @@ def _migrate_legacy_active_tasklist(client: "TasksClient", cfg: Config) -> Targe
     if not legacy_title:
         return None
 
-    matches = match_title(client.get_tasklists(), legacy_title)
-    if not matches:
+    # Exact titles only: a migration must never guess which list was meant.
+    match = match_titles(client.get_tasklists(), legacy_title)
+    if match.kind != "exact":
         cfg.pop_raw(LEGACY_DEFAULT_TASKLIST_KEY)
         ui.warn(
             f"Your saved list '{legacy_title}' no longer exists; using your default list.",
@@ -159,7 +166,7 @@ def _migrate_legacy_active_tasklist(client: "TasksClient", cfg: Config) -> Targe
         return None
 
     # Only drop the legacy key once a list is chosen, so cancelling the prompt retries later.
-    tasklist = choose_tasklist(matches, legacy_title)
+    tasklist = choose_tasklist(match, legacy_title)
     set_active_tasklist(cfg, tasklist)
     cfg.pop_raw(LEGACY_DEFAULT_TASKLIST_KEY)
     return TargetList(tasklist["id"], tasklist.get("title", legacy_title))
@@ -168,18 +175,26 @@ def _migrate_legacy_active_tasklist(client: "TasksClient", cfg: Config) -> Targe
 # --- Tasks -----------------------------------------------------------------------------
 
 
+@dataclass(frozen=True)
+class ResolvedTasks:
+    tasks: "list[Task]"
+    # The subset matched by a fragment of their title rather than an exact title or a number,
+    # so a destructive command can confirm them first.
+    partial: "list[Task]"
+
+
 def resolve_tasks_from_inputs(
     inputs: list[str],
     client: "TasksClient",
     tasklist_id: str,
     listing: ListingState | None = None,
-) -> "list[Task]":
-    """Resolve user inputs (1-based numbers or title strings) to task objects.
+) -> ResolvedTasks:
+    """Resolve user inputs (1-based numbers or titles, whole or partial) to task objects.
 
     Numbers refer to the last listing of this list the user was shown (`listing`), so
     they keep meaning what the user saw even if the list changed since. With no recorded
-    listing, they index into the current needsAction list. Titles are matched (ignoring
-    case) against that same needsAction list, which is fetched once, lazily.
+    listing, they index into the current needsAction list. Titles are matched (see
+    `title_matching`) against that same needsAction list, which is fetched once, lazily.
 
     Raises CliError on the first input that can't be resolved, so a typo never lets the
     rest of a batch `delete` go ahead.
@@ -187,6 +202,7 @@ def resolve_tasks_from_inputs(
     shown = listing.rows(tasklist_id) if listing is not None else None
     current: list | None = None
     resolved: list = []
+    partial: list = []
 
     def open_tasks() -> list:
         nonlocal current
@@ -196,16 +212,15 @@ def resolve_tasks_from_inputs(
 
     for inp in inputs:
         if not inp.isdigit():
-            resolved.append(
-                _choose_one(
-                    match_title(open_tasks(), inp),
-                    inp,
-                    noun="task",
-                    hint=_REFRESH_HINT,
-                    render=ui.render_tasks,
-                    input_fn=None,
-                )
+            match = match_titles(open_tasks(), inp)
+            task = _choose_one(
+                match, inp, noun="task", hint=_REFRESH_HINT, render=ui.render_tasks, input_fn=None
             )
+            resolved.append(task)
+            # Only a fragment that picked its task on its own needs confirming; choosing from
+            # the numbered list was already explicit.
+            if match.kind == "partial" and len(match.matches) == 1:
+                partial.append(task)
             continue
 
         n = int(inp)
@@ -230,4 +245,8 @@ def resolve_tasks_from_inputs(
 
     # `done 1 1` or a title that matches a number already given: act on each task once.
     unique = {t["id"]: t for t in resolved}
-    return list(unique.values())
+    partial_ids = {t["id"] for t in partial}
+    return ResolvedTasks(
+        tasks=list(unique.values()),
+        partial=[t for t in unique.values() if t["id"] in partial_ids],
+    )

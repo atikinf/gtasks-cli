@@ -69,6 +69,22 @@ class CacheStore:
         self._now = now
         self._pointed = False
 
+    @classmethod
+    def for_current_account(cls, root: Path) -> "CacheStore | None":
+        """The store of the account that last wrote to the cache, found without credentials.
+
+        For readers that must not sign in (shell completion). None if nothing was cached yet
+        or the record is unreadable or malformed.
+        """
+        try:
+            account = (root / _CURRENT_FILE).read_text().strip()
+        except OSError:
+            return None
+        # It names a directory under `root`: accept only what account_key() produces.
+        if not account or not all(c in "0123456789abcdef" for c in account):
+            return None
+        return cls(root, account)
+
     # --- Task lists ------------------------------------------------------------------------
 
     def read_tasklists(self) -> tuple[Tasks, float] | None:

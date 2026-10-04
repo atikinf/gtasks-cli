@@ -59,6 +59,23 @@ in `cli/title_id_resolution.py`:
   needsAction list; titles always match against it (open tasks only), fetched once per call.
   Any unresolvable input raises before a batch is sent.
 
+**Partial titles and Tab completion.** `cli/title_matching.py` is the one matcher (pure, no I/O)
+for both: titles compare case- and whitespace-insensitively; an exact title beats any partial
+(substring) match; with neither, `difflib` suggestions feed a "Did you mean" hint. Enter-matching
+(`title_id_resolution._choose_one`): one match acts, several open the numbered picker, none
+errors, with suggestions prepended to the usual hint (kept for lists: it's the stale-cache fix).
+`resolve_tasks_from_inputs` returns `ResolvedTasks(tasks, partial)`, where `partial` holds tasks a
+fragment selected on its own (not ones picked from the numbered list); `delete` confirms those
+(`prompt_yes_no`, skip with `-y`), `done` doesn't; legacy-config migration is exact-only.
+Tab completion (`cli/completion.py`, argcomplete) runs only when the shell sets `_ARGCOMPLETE` —
+`app.main` answers and exits before parsing, and never falls through to a command. Completers
+read fresh cache data only, via `CacheStore.for_current_account` (no credentials, no Google
+imports), match title prefixes (`complete_titles`), never raise, and are attached with
+`completion.attach(action, fn)`. `complete_tasks` returns `{title: due label}`: zsh and fish
+show descriptions, bash ignores them. `gtasks completion <shell>` prints argcomplete's snippet;
+for zsh it appends a `matcher-list` zstyle scoped to gtasks so zsh doesn't drop candidates whose
+case differs from what was typed (zsh filters case-sensitively by default).
+
 **Output and errors.** All terminal output goes through `cli/ui.py` (rich, one `THEME` of semantic
 styles); handlers never `print`. User strings are wrapped in `Text`, never interpolated into rich
 markup. Handlers raise `cli/errors.py:CliError(message, hint=, exit_code=)` instead of printing

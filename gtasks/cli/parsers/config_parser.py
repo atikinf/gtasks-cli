@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from rich.text import Text
 
 from gtasks.cli import ui
+from gtasks.cli.completion import attach, complete_config_keys, complete_config_values
 from gtasks.cli.errors import CliError
 from gtasks.utils.config import LEGACY_DEFAULT_TASKLIST_KEY, Config, ConfigKey
 
@@ -82,18 +83,20 @@ def add_subparser_config(subparsers) -> None:
         help="View or set config defaults",
         description="View all settings or get/set a specific configuration value.",
     )
-    config_parser.add_argument(
+    key_arg = config_parser.add_argument(
         "key",
         type=str,
         nargs="?",
         default=None,
         help=f"Config key to read or set (one of: {_VALID_KEYS})",
     )
-    config_parser.add_argument(
+    attach(key_arg, complete_config_keys)
+    value_arg = config_parser.add_argument(
         "value",
         type=str,
         nargs="?",
         default=None,
         help="Value to assign to the key",
     )
+    attach(value_arg, complete_config_values)
     config_parser.set_defaults(func=cmd_config)

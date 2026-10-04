@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Main entry point for the Google Tasks CLI."""
 
+import os
 import sys
 from functools import cache
 from typing import TYPE_CHECKING
@@ -61,6 +62,13 @@ def _report_error(e: Exception) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
+    if "_ARGCOMPLETE" in os.environ:
+        # The shell is asking for Tab completions: answer from local data and exit, before
+        # anything else is loaded or built.
+        from gtasks.cli.completion import complete
+
+        complete(parser)
+        return 0  # only reached if completion couldn't run; never fall through to a command
     args = parser.parse_args(argv)
 
     try:

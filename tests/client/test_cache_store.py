@@ -337,3 +337,25 @@ class TestAccounts:
         clear_cache(root)
 
         assert not root.exists()
+
+
+class TestForCurrentAccount:
+    def test_GIVEN_account_wrote_cache_THEN_found_without_credentials(self, root: Path) -> None:
+        CacheStore(root, account_key("c", "r")).write_tasklists([{"id": "l1"}])
+
+        store = CacheStore.for_current_account(root)
+
+        assert store is not None
+        assert store.read_tasklists() is not None
+
+    def test_GIVEN_nothing_cached_THEN_none(self, root: Path) -> None:
+        assert CacheStore.for_current_account(root) is None
+
+    @pytest.mark.parametrize(
+        "content", ["", "../../etc", "not hex!"], ids=["empty", "path", "junk"]
+    )
+    def test_GIVEN_malformed_record_THEN_none(self, root: Path, content: str) -> None:
+        root.mkdir(parents=True)
+        (root / "current").write_text(content)
+
+        assert CacheStore.for_current_account(root) is None

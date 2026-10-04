@@ -50,6 +50,12 @@ def validate_client_secret(client_secret: str) -> bool:
     return bool(re.match(pattern, client_secret))
 
 
+def prompt_yes_no(question: str, input_fn: Callable[[str], str] | None = None) -> bool:
+    """Ask a yes/no question; anything but y/yes (including just Enter) means no."""
+    answer = (input_fn or input)(f"{question} [y/N] ")
+    return answer.strip().lower() in ("y", "yes")
+
+
 def prompt_index_choice(
     num_options: int,
     prompt_prefix: str,
@@ -85,14 +91,14 @@ def add_shared_option(
     top_level: bool,
     default: Any,
     **kwargs: Any,
-) -> None:
+) -> argparse.Action:
     """Register an option accepted both before and after the subcommand.
 
     Register it on the top-level parser (`top_level=True`, which owns `default`) and on each
     subparser. Subparser copies default to SUPPRESS: otherwise their default would overwrite
     a value given before the subcommand, as in `gtasks -l Work done 1`.
     """
-    parser.add_argument(
+    return parser.add_argument(
         *flags,
         default=default if top_level else argparse.SUPPRESS,
         **kwargs,

@@ -5,6 +5,7 @@ import argparse
 from gtasks.cli.cli_utils import add_refresh_option
 from gtasks.cli.parsers.add_parser import add_subparser_add_task
 from gtasks.cli.parsers.auth_parser import add_subparser_auth
+from gtasks.cli.parsers.completion_parser import add_subparser_completion
 from gtasks.cli.parsers.config_parser import add_subparser_config
 from gtasks.cli.parsers.delete_parser import add_subparser_delete
 from gtasks.cli.parsers.done_parser import add_subparser_done
@@ -54,5 +55,6 @@ def build_parser() -> argparse.ArgumentParser:
     add_subparser_delete(subparsers)
     add_subparser_config(subparsers)
     add_subparser_auth(subparsers)
+    add_subparser_completion(subparsers)
 
     return parser

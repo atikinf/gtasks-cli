@@ -10,12 +10,13 @@ from gtasks.cli.cli import build_parser
 from gtasks.cli.errors import Cancelled, CliError
 from gtasks.cli.title_id_resolution import (
     ENV_VAR,
+    ResolvedTasks,
     TargetList,
     choose_tasklist,
-    match_title,
     resolve_target_tasklist,
     resolve_tasks_from_inputs,
 )
+from gtasks.cli.title_matching import match_titles
 from gtasks.utils.config import LEGACY_DEFAULT_TASKLIST_KEY, Config, ConfigKey
 from gtasks.utils.listing_state import ListingState
 
@@ -162,15 +163,17 @@ class TestChooseTasklist:
     def test_GIVEN_single_match_THEN_returns_without_prompting(self) -> None:
         mock_input = Mock()
 
-        assert choose_tasklist([WORK], "Work", mock_input) == WORK
+        assert choose_tasklist(match_titles([WORK], "Work"), "Work", mock_input) == WORK
         mock_input.assert_not_called()
 
     def test_GIVEN_duplicates_THEN_prompts(self) -> None:
-        assert choose_tasklist([WORK, WORK_DUPE], "Work", Mock(return_value="2")) == WORK_DUPE
+        match = match_titles([WORK, WORK_DUPE], "Work")
+
+        assert choose_tasklist(match, "Work", Mock(return_value="2")) == WORK_DUPE
 
     def test_GIVEN_duplicates_and_cancel_THEN_raises_cancelled(self) -> None:
         with pytest.raises(Cancelled):
-            choose_tasklist([WORK, WORK_DUPE], "Work", Mock(return_value="q"))
+            choose_tasklist(match_titles([WORK, WORK_DUPE], "Work"), "Work", Mock(return_value="q"))
 
 
 class TestTasklistOption:
@@ -191,23 +194,74 @@ class TestTasklistOption:
         assert build_parser().parse_args(["done", "1"]).tasklist_title is None
 
 
-class TestMatchTitle:
-    def test_match_title_GIVEN_different_case_THEN_matches(self) -> None:
-        assert match_title([WORK, HOME], "wORK") == [WORK]
+class TestFindTasklistMatching:
+    """List lookups (-l, $GTASKS_LIST, `use NAME`) accept a fragment: switching is reversible."""
 
-    def test_match_title_GIVEN_no_match_THEN_returns_empty(self) -> None:
-        assert match_title([WORK, HOME], "Gym") == []
+    @pytest.mark.parametrize(
+        "typed", ["wor", "WORK", "  work "], ids=["fragment", "case", "spacing"]
+    )
+    def test_GIVEN_unique_match_THEN_resolves_without_prompt(
+        self, mock_client: Mock, config: Config, typed: str
+    ) -> None:
+        with patch("builtins.input") as mock_input:
+            result = resolve_target_tasklist(_args(typed), mock_client, config, environ={})
 
-    def test_match_title_GIVEN_prefix_only_THEN_does_not_match(self) -> None:
-        assert match_title([WORK], "Wor") == []
+        assert result.id == "list1"
+        mock_input.assert_not_called()
 
-    def test_match_title_GIVEN_duplicates_THEN_returns_all(self) -> None:
-        dupe = {"id": "list4", "title": "work"}
+    def test_GIVEN_exact_title_also_contained_in_another_THEN_exact_wins(
+        self, mock_client: Mock, config: Config
+    ) -> None:
+        mock_client.get_tasklists.return_value = [{"id": "x", "title": "Work trips"}, WORK]
 
-        assert match_title([WORK, HOME, dupe], "Work") == [WORK, dupe]
+        assert resolve_target_tasklist(_args("work"), mock_client, config, environ={}).id == "list1"
 
-    def test_match_title_GIVEN_item_without_id_THEN_skips_it(self) -> None:
-        assert match_title([{"title": "Work"}, WORK], "Work") == [WORK]
+    def test_GIVEN_fragment_of_several_THEN_picker_says_match(
+        self, mock_client: Mock, config: Config, capsys: CaptureFixture[str]
+    ) -> None:
+        mock_client.get_tasklists.return_value = [WORK, {"id": "x", "title": "Homework"}]
+
+        with patch("builtins.input", return_value="2"):
+            result = resolve_target_tasklist(_args("wor"), mock_client, config, environ={})
+
+        assert result.id == "x"
+        assert "Several task lists match 'wor':" in capsys.readouterr().out
+
+    def test_GIVEN_typo_THEN_error_suggests_close_title(
+        self, mock_client: Mock, config: Config
+    ) -> None:
+        with pytest.raises(CliError) as exc:
+            resolve_target_tasklist(_args("Wrok"), mock_client, config, environ={})
+
+        assert exc.value.hint is not None
+        assert exc.value.hint.startswith("Did you mean 'Work'?")
+
+    def test_GIVEN_near_miss_in_stale_cache_THEN_hint_still_offers_refresh(
+        self, mock_client: Mock, config: Config
+    ) -> None:
+        """A list created elsewhere ("Camping") isn't in the cached lists yet; the near-miss
+        suggestion may be wrong, so the refresh advice must survive."""
+        mock_client.get_tasklists.return_value = [{"id": "x", "title": "Clamping"}]
+
+        with pytest.raises(CliError) as exc:
+            resolve_target_tasklist(_args("Camping"), mock_client, config, environ={})
+
+        assert exc.value.hint is not None
+        assert "Did you mean 'Clamping'?" in exc.value.hint
+        assert "gtasks lists --refresh" in exc.value.hint
+
+    def test_GIVEN_legacy_title_only_partially_matching_THEN_not_migrated(
+        self, mock_client: Mock, tmp_path: Path
+    ) -> None:
+        """Migration must never guess: a legacy "Wor" doesn't become "Work"."""
+        path = tmp_path / "config.toml"
+        path.write_text(f"[DEFAULT]\n{LEGACY_DEFAULT_TASKLIST_KEY} = Wor\n")
+        legacy_config = Config(path, ConfigParser())
+
+        result = resolve_target_tasklist(_args(), mock_client, legacy_config, environ={})
+
+        assert result.id == "default-id"
+        assert legacy_config.get(ConfigKey.ACTIVE_TASKLIST_ID) is None
 
 
 class TestResolveTasksFromInputs:
@@ -228,7 +282,7 @@ class TestResolveTasksFromInputs:
     ) -> None:
         result = resolve_tasks_from_inputs(["1"], mock_client, "list1")
 
-        assert result == [self.SAMPLE_TASKS[0]]
+        assert result.tasks == [self.SAMPLE_TASKS[0]]
         mock_client.get_tasks.assert_called_once_with("list1", show_completed=False)
 
     def test_GIVEN_multiple_indices_THEN_resolves_all(
@@ -236,7 +290,7 @@ class TestResolveTasksFromInputs:
     ) -> None:
         result = resolve_tasks_from_inputs(["1", "3"], mock_client, "list1")
 
-        assert result == [self.SAMPLE_TASKS[0], self.SAMPLE_TASKS[2]]
+        assert result.tasks == [self.SAMPLE_TASKS[0], self.SAMPLE_TASKS[2]]
 
     def test_GIVEN_title_input_THEN_matches_against_open_tasks_only(
         self, mock_client: Mock
@@ -250,12 +304,12 @@ class TestResolveTasksFromInputs:
     ) -> None:
         result = resolve_tasks_from_inputs(["Walk dog"], mock_client, "list1")
 
-        assert result == [self.SAMPLE_TASKS[1]]
+        assert result.tasks == [self.SAMPLE_TASKS[1]]
 
     def test_GIVEN_title_in_different_case_THEN_matches(self, mock_client: Mock) -> None:
         result = resolve_tasks_from_inputs(["WALK DOG"], mock_client, "list1")
 
-        assert result == [self.SAMPLE_TASKS[1]]
+        assert result.tasks == [self.SAMPLE_TASKS[1]]
 
     def test_GIVEN_out_of_range_index_THEN_raises(self, mock_client: Mock) -> None:
         with pytest.raises(CliError, match="no task #99"):
@@ -266,7 +320,7 @@ class TestResolveTasksFromInputs:
     ) -> None:
         result = resolve_tasks_from_inputs(["1", "Call dentist"], mock_client, "list1")
 
-        assert result == [self.SAMPLE_TASKS[0], self.SAMPLE_TASKS[2]]
+        assert result.tasks == [self.SAMPLE_TASKS[0], self.SAMPLE_TASKS[2]]
         mock_client.get_tasks.assert_called_once()
 
     def test_GIVEN_unresolvable_title_THEN_raises(self, mock_client: Mock) -> None:
@@ -282,7 +336,7 @@ class TestResolveTasksFromInputs:
     def test_GIVEN_same_task_twice_THEN_returned_once(self, mock_client: Mock) -> None:
         result = resolve_tasks_from_inputs(["1", "Buy milk", "1"], mock_client, "list1")
 
-        assert result == [self.SAMPLE_TASKS[0]]
+        assert result.tasks == [self.SAMPLE_TASKS[0]]
 
     def test_GIVEN_duplicate_titles_THEN_prompts(self, mock_client: Mock) -> None:
         dupes = [{"id": "a", "title": "Same"}, {"id": "b", "title": "Same"}]
@@ -291,7 +345,62 @@ class TestResolveTasksFromInputs:
         with patch("builtins.input", return_value="2"):
             result = resolve_tasks_from_inputs(["Same"], mock_client, "list1")
 
-        assert result == [dupes[1]]
+        assert result.tasks == [dupes[1]]
+
+
+class TestPartialTaskMatching:
+    TASKS = [
+        {"id": "t1", "title": "Buy milk"},
+        {"id": "t2", "title": "Buy oat milk"},
+        {"id": "t3", "title": "Call dentist"},
+    ]
+
+    @pytest.fixture
+    def mock_client(self) -> Mock:
+        client = Mock()
+        client.get_tasks.return_value = self.TASKS
+        return client
+
+    def test_GIVEN_unique_fragment_THEN_resolved_and_flagged_partial(
+        self, mock_client: Mock
+    ) -> None:
+        result = resolve_tasks_from_inputs(["dent"], mock_client, "l1")
+
+        assert result == ResolvedTasks(tasks=[self.TASKS[2]], partial=[self.TASKS[2]])
+
+    def test_GIVEN_exact_title_and_number_THEN_nothing_flagged_partial(
+        self, mock_client: Mock
+    ) -> None:
+        result = resolve_tasks_from_inputs(["buy MILK", "3"], mock_client, "l1")
+
+        assert result.tasks == [self.TASKS[0], self.TASKS[2]]
+        assert result.partial == []
+
+    def test_GIVEN_fragment_of_several_THEN_prompts_and_choice_not_flagged(
+        self, mock_client: Mock, capsys: CaptureFixture[str]
+    ) -> None:
+        """Picking from the numbered list is explicit: `delete` mustn't ask a second time."""
+        with patch("builtins.input", return_value="2"):
+            result = resolve_tasks_from_inputs(["milk"], mock_client, "l1")
+
+        assert result.tasks == [self.TASKS[1]]
+        assert result.partial == []
+        assert "Several tasks match 'milk':" in capsys.readouterr().out
+
+    def test_GIVEN_typo_THEN_did_you_mean(self, mock_client: Mock) -> None:
+        with pytest.raises(CliError) as exc:
+            resolve_tasks_from_inputs(["Call dnetist"], mock_client, "l1")
+
+        assert exc.value.hint is not None
+        assert exc.value.hint.startswith("Did you mean 'Call dentist'?")
+
+    def test_GIVEN_same_task_by_fragment_and_number_THEN_once_still_partial(
+        self, mock_client: Mock
+    ) -> None:
+        result = resolve_tasks_from_inputs(["3", "dent"], mock_client, "l1")
+
+        assert result.tasks == [self.TASKS[2]]
+        assert result.partial == [self.TASKS[2]]
 
 
 class TestResolveAgainstLastListing:
@@ -312,7 +421,7 @@ class TestResolveAgainstLastListing:
 
         result = resolve_tasks_from_inputs(["2"], client, "list1", listing)
 
-        assert result == [self.SHOWN[1]]
+        assert result.tasks == [self.SHOWN[1]]
         client.get_tasks.assert_not_called()
 
     def test_GIVEN_listing_for_other_list_THEN_falls_back_to_fetch(
@@ -323,7 +432,7 @@ class TestResolveAgainstLastListing:
 
         result = resolve_tasks_from_inputs(["1"], client, "list2", listing)
 
-        assert result == [{"id": "x", "title": "Other"}]
+        assert result.tasks == [{"id": "x", "title": "Other"}]
 
     def test_GIVEN_index_past_listing_THEN_raises_with_count(
         self, listing: ListingState

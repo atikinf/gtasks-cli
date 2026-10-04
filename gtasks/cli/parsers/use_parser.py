@@ -7,6 +7,7 @@ from rich.text import Text
 
 from gtasks.cli import ui
 from gtasks.cli.cli_utils import add_refresh_option, prompt_index_choice
+from gtasks.cli.completion import attach, complete_tasklists
 from gtasks.cli.errors import Cancelled, CliError
 from gtasks.cli.title_id_resolution import find_tasklist, set_active_tasklist
 from gtasks.utils.config import Config, ConfigKey
@@ -49,12 +50,13 @@ def add_subparser_use(subparsers) -> None:
             "Pick interactively if no name is given."
         ),
     )
-    use_parser.add_argument(
+    name_arg = use_parser.add_argument(
         "name",
         type=str,
         nargs="?",
         default=None,
         help="Name of the task list to make active",
     )
+    attach(name_arg, complete_tasklists)
     add_refresh_option(use_parser)
     use_parser.set_defaults(func=cmd_use)

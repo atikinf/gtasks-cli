@@ -15,6 +15,7 @@ HEAVY = (
     "google_auth_httplib2",
     "httplib2",
     "dateparser",
+    "argcomplete",  # only while the shell asks for completions
 )
 
 

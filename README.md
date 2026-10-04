@@ -15,12 +15,27 @@ gtasks lists              # all task lists (● marks the active one)
 gtasks use Work           # set the active list (omit the name to pick interactively)
 gtasks add "Buy milk" -d "next fri" -n "2%"
 gtasks done 1 3           # by the numbers shown in the last listing, or by title
-gtasks delete "Buy milk"
+gtasks done milk          # part of a title works too, if only one task matches
+gtasks delete "Buy milk"  # a partial title asks before deleting (-y to skip)
 ```
+
+Titles ignore case. If part of a title matches several tasks or lists, you pick one from a numbered list; if nothing matches, close spellings are suggested.
 
 Commands act on the active list. Override it per command with `-l LIST`, or per shell with `GTASKS_LIST=LIST`. If no list is active, your default Google Tasks list is used.
 
 Lists and tasks are cached for up to 30 minutes (in `~/.cache/gtasks-cli`), so repeat listings are instant; a listing served from the cache says how old it is. Changes made in gtasks show up immediately. To see changes made elsewhere sooner, add `--refresh`, or turn caching off with `gtasks config cache off`.
+
+### Tab completion
+
+Task and list titles can be completed with Tab. Add one line to your shell config:
+
+```
+eval "$(gtasks completion zsh)"     # ~/.zshrc
+eval "$(gtasks completion bash)"    # ~/.bashrc
+gtasks completion fish | source     # ~/.config/fish/config.fish
+```
+
+Completion matches the start of a title, ignoring case, and uses the local cache only (so it's instant and works offline); if the cache has expired, run any listing to refresh it. In zsh and fish, tasks show their due date alongside.
 
 ### Development
 
@@ -39,7 +54,6 @@ Install [`uv`](https://docs.astral.sh/uv/) (`brew install uv` on macOS), then fr
 
 *Stretch Goals*:
 * "Show completed" mode — fetch needsAction tasks, then read recently-completed tasks from a local cache (populated by `gtasks done`) to append as strikethrough. Avoids a second API call. Configurable via `gtasks config`.
-* Tab-autocomplete for task list names
 * Benchmark startup latency — profile lazy-importing `dateparser`, `googleapiclient.discovery`, and `google_auth_oauthlib.flow`.
 * Bulk "clear completed tasks" for a list (wraps the Tasks API's `tasks.clear`).
 * Subtask support (the Tasks API's `parent` field on a task).

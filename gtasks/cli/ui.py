@@ -73,6 +73,13 @@ def use_consoles(stdout: Console | None, stderr: Console | None) -> None:
 # =============================================================================
 
 
+def raw(text: str) -> None:
+    """Write text verbatim (no markup, styling or wrapping), e.g. a script for a shell to eval."""
+    file = out().file
+    file.write(text if text.endswith("\n") else text + "\n")
+    file.flush()
+
+
 def error(message: str, hint: str | None = None) -> None:
     err().print(Text.assemble(("error: ", "error"), message))
     if hint:
