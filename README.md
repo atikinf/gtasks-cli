@@ -23,7 +23,7 @@ Titles ignore case. If part of a title matches several tasks or lists, you pick 
 
 Commands act on the active list. Override it per command with `-l LIST`, or per shell with `GTASKS_LIST=LIST`. If no list is active, your default Google Tasks list is used.
 
-Lists and tasks are cached for up to 30 minutes (in `~/.cache/gtasks-cli`), so repeat listings are instant; a listing served from the cache says how old it is. Changes made in gtasks show up immediately. To see changes made elsewhere sooner, add `--refresh`, or turn caching off with `gtasks config cache off`.
+Lists and tasks are cached for up to 30 minutes (in `~/.cache/gtasks-cli`), so repeat listings are instant; each listing says whether it came from the cache or refreshed it. Changes made in gtasks show up immediately. To see changes made elsewhere sooner, add `--refresh`, or turn caching off with `gtasks config cache off`.
 
 ### Tab completion
 
@@ -54,7 +54,6 @@ Install [`uv`](https://docs.astral.sh/uv/) (`brew install uv` on macOS), then fr
 
 *Stretch Goals*:
 * "Show completed" mode — fetch needsAction tasks, then read recently-completed tasks from a local cache (populated by `gtasks done`) to append as strikethrough. Avoids a second API call. Configurable via `gtasks config`.
-* Benchmark startup latency — profile lazy-importing `dateparser`, `googleapiclient.discovery`, and `google_auth_oauthlib.flow`.
 * Bulk "clear completed tasks" for a list (wraps the Tasks API's `tasks.clear`).
 * Subtask support (the Tasks API's `parent` field on a task).
 * Move/reorder tasks, including moving a task to a different list (`tasks.move`).
