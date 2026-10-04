@@ -1,19 +1,17 @@
 """Lists subcommand - list all task lists."""
 
 import argparse
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from gtasks.cli import ui
+from gtasks.cli.cli_utils import add_refresh_option
 from gtasks.utils.config import Config, ConfigKey
 
 if TYPE_CHECKING:
-    from gtasks.client.protocol import TasksClient
+    from gtasks.client.protocol import ClientProvider
 
 
-def cmd_list_tasklists(
-    args: argparse.Namespace, get_client: "Callable[[], TasksClient]", cfg: Config
-) -> None:
+def cmd_list_tasklists(args: argparse.Namespace, get_client: "ClientProvider", cfg: Config) -> None:
     """Handle the 'lists' command to display task lists, marking the active one."""
     client = get_client()
     tasklists = client.get_tasklists(args.limit)
@@ -50,4 +48,5 @@ def add_subparser_lists(subparsers) -> None:
         default=False,
         help="Include task list IDs in the output",
     )
+    add_refresh_option(lists_parser)
     lists_parser.set_defaults(func=cmd_list_tasklists)

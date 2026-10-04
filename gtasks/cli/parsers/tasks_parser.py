@@ -1,21 +1,20 @@
 """Tasks subcommand - list tasks from a task list."""
 
 import argparse
-from collections.abc import Callable
+import time
 from typing import TYPE_CHECKING
 
 from gtasks.cli import ui
+from gtasks.cli.cli_utils import add_refresh_option
 from gtasks.cli.title_id_resolution import add_tasklist_option, resolve_target_tasklist
 from gtasks.utils.config import Config
 from gtasks.utils.listing_state import ListingState
 
 if TYPE_CHECKING:
-    from gtasks.client.protocol import TasksClient
+    from gtasks.client.protocol import ClientProvider
 
 
-def cmd_list_tasks(
-    args: argparse.Namespace, get_client: "Callable[[], TasksClient]", cfg: Config
-) -> None:
+def cmd_list_tasks(args: argparse.Namespace, get_client: "ClientProvider", cfg: Config) -> None:
     """Handle the 'tasks' command (and bare `gtasks`) to display open tasks."""
     client = get_client()
     target = resolve_target_tasklist(args, client, cfg)
@@ -29,7 +28,14 @@ def cmd_list_tasks(
     truncated = args.limit is not None and len(tasks) > args.limit
     tasks = tasks[: args.limit] if truncated else tasks
 
-    ui.render_tasks(tasks, heading=target.title, show_ids=args.show_ids, truncated=truncated)
+    fetched_at = client.tasks_fetched_at(target.id)
+    ui.render_tasks(
+        tasks,
+        heading=target.title,
+        show_ids=args.show_ids,
+        truncated=truncated,
+        cached_age=time.time() - fetched_at if fetched_at is not None else None,
+    )
     ListingState.beside(cfg).save(target.id, tasks)
 
 
@@ -53,4 +59,5 @@ def add_subparser_tasks(subparsers) -> None:
         action="store_true",
         help="Include task IDs in output",
     )
+    add_refresh_option(tasks_parser)
     tasks_parser.set_defaults(func=cmd_list_tasks)

@@ -1,18 +1,18 @@
 """Auth subcommand - configure OAuth credentials."""
 
 import argparse
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from gtasks.cli import ui
 from gtasks.cli.cli_utils import prompt_setup_credentials
 from gtasks.cli.errors import Cancelled
+from gtasks.client.cache_store import clear_cache
 from gtasks.client.client_factory import auth
-from gtasks.defaults import APP_CFG_PATH
+from gtasks.defaults import APP_CFG_PATH, CACHE_DIR
 from gtasks.utils.config import Config
 
 if TYPE_CHECKING:
-    from gtasks.client.protocol import TasksClient
+    from gtasks.client.protocol import ClientProvider
 
 TOKEN_PATH = APP_CFG_PATH / "token.pickle"
 
@@ -29,9 +29,7 @@ Enter 'q' at any prompt to cancel.
 """
 
 
-def cmd_auth(
-    args: argparse.Namespace, get_client: "Callable[[], TasksClient]", cfg: Config
-) -> None:
+def cmd_auth(args: argparse.Namespace, get_client: "ClientProvider", cfg: Config) -> None:
     """Handle the 'auth' command to configure OAuth credentials.
 
     Never calls `get_client`: building a client needs the credentials this
@@ -45,6 +43,9 @@ def cmd_auth(
 
     client_id, client_secret = result
     auth(TOKEN_PATH, client_id, client_secret)
+    # Cached data is per account, so this is tidiness, not correctness: drop what a previous
+    # sign-in left behind.
+    clear_cache(CACHE_DIR)
     ui.success("Authenticated. You're ready to use gtasks.")
 
 

@@ -13,6 +13,10 @@ if TYPE_CHECKING:
     from googleapiclient._apis.tasks.v1.schemas import Task, TaskList
 
 
+# Tasks API alias for the account's primary list ("My Tasks"), accepted wherever a list ID is.
+DEFAULT_TASKLIST_ID = "@default"
+
+
 class Status(Enum):
     NEEDS_ACTION = "needsAction"
     COMPLETED = "completed"
@@ -83,3 +87,20 @@ class TasksClient(Protocol):
     def clear_completed_tasks(self, tasklist_id: str) -> None: ...
 
     def delete_tasks(self, tasklist_id: str, task_ids: list[str]) -> None: ...
+
+    # Not part of the Tasks API: lets callers say when they're showing cached data.
+
+    def tasks_fetched_at(self, tasklist_id: str) -> float | None:
+        """When the open tasks last returned for this list were fetched (a Unix time), if
+        they came from a cache; None if they were fetched live."""
+        ...
+
+
+class ClientProvider(Protocol):
+    """What handlers receive as `get_client`: builds (once per run) the client to use.
+
+    `fresh=True` asks for a client that never serves cached reads, for commands whose reads
+    decide which task a write hits (`done`, `delete`).
+    """
+
+    def __call__(self, *, fresh: bool = False) -> TasksClient: ...

@@ -93,6 +93,18 @@ class TestResolveTargetTasklist:
         with pytest.raises(CliError, match="No task list named 'Nope'"):
             resolve_target_tasklist(_args("Nope"), mock_client, config, environ={})
 
+    def test_GIVEN_unknown_title_THEN_hint_refreshes_the_cached_lists(
+        self, mock_client: Mock, config: Config
+    ) -> None:
+        """Lookups use cached lists, so the hint must lead to a fresh fetch (one created
+        elsewhere in the last 30 minutes wouldn't appear in a cached `gtasks lists`)."""
+        mock_client.get_tasklists.return_value = []
+
+        with pytest.raises(CliError) as exc:
+            resolve_target_tasklist(_args("New"), mock_client, config, environ={})
+
+        assert exc.value.hint is not None and "gtasks lists --refresh" in exc.value.hint
+
 
 class TestLegacyMigration:
     @pytest.fixture

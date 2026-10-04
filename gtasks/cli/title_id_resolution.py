@@ -19,8 +19,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from gtasks.cli import ui
-from gtasks.cli.cli_utils import prompt_index_choice
+from gtasks.cli.cli_utils import add_shared_option, prompt_index_choice
 from gtasks.cli.errors import Cancelled, CliError
+from gtasks.client.protocol import DEFAULT_TASKLIST_ID
 from gtasks.utils.config import LEGACY_DEFAULT_TASKLIST_KEY, Config, ConfigKey
 from gtasks.utils.listing_state import ListingState
 
@@ -30,8 +31,6 @@ if TYPE_CHECKING:
     from gtasks.client.protocol import TasksClient
 
 ENV_VAR = "GTASKS_LIST"
-# Tasks API alias for the account's primary list ("My Tasks").
-DEFAULT_TASKLIST_ID = "@default"
 
 _REFRESH_HINT = "Run `gtasks tasks` to see the current numbers."
 
@@ -88,7 +87,8 @@ def choose_tasklist(
         matches,
         title,
         noun="task list",
-        hint="Run `gtasks lists` to see them.",
+        # --refresh also updates the cached lists, so retrying the command then finds it.
+        hint="Run `gtasks lists --refresh` to see current lists.",
         render=ui.render_tasklists,
         input_fn=input_fn,
     )
@@ -105,18 +105,16 @@ def set_active_tasklist(cfg: Config, tasklist: "TaskList") -> None:
 
 
 def add_tasklist_option(parser: argparse.ArgumentParser, *, top_level: bool = False) -> None:
-    """Register -l/--list, so it reads the same on every list-scoped command.
-
-    It's on the top-level parser too (`gtasks -l Work`). Subparser copies default to
-    SUPPRESS: otherwise their None would overwrite a value given before the subcommand,
-    as in `gtasks -l Work done 1`.
-    """
-    parser.add_argument(
+    """Register -l/--list, so it reads the same on every list-scoped command (and before
+    the subcommand: `gtasks -l Work`)."""
+    add_shared_option(
+        parser,
         "-l",
         "--list",
+        top_level=top_level,
+        default=None,
         dest="tasklist_title",
         metavar="LIST",
-        default=None if top_level else argparse.SUPPRESS,
         help=f"task list to act on (default: ${ENV_VAR}, else the active list)",
     )
 

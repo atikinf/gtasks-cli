@@ -3,15 +3,19 @@
 import pickle
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
+import httplib2
 from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
+from google_auth_httplib2 import AuthorizedHttp
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
 from gtasks.client.api_client import ApiClient
+from gtasks.client.cache_store import CacheStore, account_key
+from gtasks.client.caching_client import CachingClient
 from gtasks.client.protocol import TasksClient
 from gtasks.defaults import APP_CFG_PATH
 
@@ -31,17 +35,51 @@ class SignInRequiredError(Exception):
     """
 
 
-def build_tasks_resource(
+# A concurrent cache refetch gets its own connection with a timeout, so it can never hang
+# the command it runs alongside.
+_REFETCH_TIMEOUT_SECONDS = 10
+
+
+def build_tasks_resource(creds: Credentials, timeout: float | None = None) -> "TasksResource":
+    """Build a Google Tasks API resource with its own HTTP connection.
+
+    Each resource owns a separate httplib2 connection, which isn't thread-safe: code running
+    on another thread must build its own resource rather than share one.
+    """
+    if timeout is None:
+        return build("tasks", "v1", credentials=creds)
+    http = AuthorizedHttp(creds, http=httplib2.Http(timeout=timeout))
+    # AuthorizedHttp is the documented way to pass credentials with a custom Http, but the
+    # stubs only accept a plain httplib2.Http here.
+    return build("tasks", "v1", http=cast(httplib2.Http, http))
+
+
+def build_client(
+    *,
+    fresh: bool = False,
+    cache_dir: Path | None = None,
     token_path: Path = APP_CFG_PATH / "token.pickle",
     creds_path: Path = APP_CFG_PATH / "credentials.json",
-) -> "TasksResource":
-    """Build and return a Google Tasks API resource."""
+) -> TasksClient:
+    """Sign in and build the client: cached under `cache_dir` if given, else plain.
+
+    Credentials are loaded (and refreshed if expired) once, before any client is built, so
+    the main client and a concurrent refetch never race to refresh the same token.
+    """
     creds: Credentials = auth_from_file(token_path, creds_path)
-    return build("tasks", "v1", credentials=creds)
+    api = ApiClient(build_tasks_resource(creds))
+    if cache_dir is None:
+        return api
 
-
-def build_client() -> TasksClient:
-    return ApiClient(build_tasks_resource())
+    store = CacheStore(cache_dir, account_key(creds.client_id, creds.refresh_token))
+    return CachingClient(
+        api,
+        store,
+        fresh=fresh,
+        make_refresher=lambda: ApiClient(
+            build_tasks_resource(creds, timeout=_REFETCH_TIMEOUT_SECONDS)
+        ),
+    )
 
 
 def _load_or_refresh_creds(
@@ -62,23 +100,22 @@ def _load_or_refresh_creds(
     if creds and creds.valid:
         return creds
 
-    refreshed = False
     if creds and creds.expired and creds.refresh_token:
         try:
             creds.refresh(Request())
-            refreshed = True
         except RefreshError:
             # Revoked or long-expired refresh token: fall through and sign in again.
             # Without this, `gtasks auth` could never replace a dead token.
             pass
+        else:
+            write_creds_to_file(creds, token_path)
+            return creds
 
-    if not refreshed:
-        flow = build_flow()
-        # Perform auth via local web server and browser-based consent screen.
-        creds = flow.run_local_server()
-
-    write_creds_to_file(creds, token_path)
-    return creds
+    flow = build_flow()
+    # Perform auth via local web server and browser-based consent screen.
+    new_creds: Credentials = flow.run_local_server()
+    write_creds_to_file(new_creds, token_path)
+    return new_creds
 
 
 def auth(token_path: Path, client_id: str, client_secret: str) -> Credentials:
@@ -102,7 +139,7 @@ def auth(token_path: Path, client_id: str, client_secret: str) -> Credentials:
 
 
 def auth_from_file(token_path: Path, creds_path: Path) -> Credentials:
-    """Authenticate using a `credentials.json` file (used by `build_tasks_resource`)."""
+    """Authenticate using a `credentials.json` file (used by `build_client`)."""
 
     def build_flow() -> InstalledAppFlow:
         try:

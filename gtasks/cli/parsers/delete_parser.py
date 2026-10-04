@@ -1,10 +1,10 @@
 """Delete subcommand - delete tasks by name or display index."""
 
 import argparse
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from gtasks.cli import ui
+from gtasks.cli.cli_utils import add_refresh_option
 from gtasks.cli.title_id_resolution import (
     add_tasklist_option,
     resolve_target_tasklist,
@@ -14,14 +14,13 @@ from gtasks.utils.config import Config
 from gtasks.utils.listing_state import ListingState
 
 if TYPE_CHECKING:
-    from gtasks.client.protocol import TasksClient
+    from gtasks.client.protocol import ClientProvider
 
 
-def cmd_delete(
-    args: argparse.Namespace, get_client: "Callable[[], TasksClient]", cfg: Config
-) -> None:
+def cmd_delete(args: argparse.Namespace, get_client: "ClientProvider", cfg: Config) -> None:
     """Handle the 'delete' command to remove one or more tasks."""
-    client = get_client()
+    # Fresh: stale data here could make the write hit the wrong task.
+    client = get_client(fresh=True)
     target = resolve_target_tasklist(args, client, cfg)
     listing = ListingState.beside(cfg)
     tasks = resolve_tasks_from_inputs(args.tasks, client, target.id, listing)
@@ -46,4 +45,5 @@ def add_subparser_delete(subparsers) -> None:
         help="Titles, or numbers as shown by `gtasks`, of tasks to delete",
     )
     add_tasklist_option(delete_parser)
+    add_refresh_option(delete_parser)
     delete_parser.set_defaults(func=cmd_delete)

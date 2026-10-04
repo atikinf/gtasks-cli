@@ -8,6 +8,7 @@ DEFAULT_SECTION: str = "DEFAULT"
 class ConfigKey(Enum):
     ACTIVE_TASKLIST_ID = "active_tasklist_id"
     ACTIVE_TASKLIST_TITLE = "active_tasklist_title"
+    CACHE = "cache"
 
 
 # Pre-ID versions stored the active list by title under this key. Read once and migrated

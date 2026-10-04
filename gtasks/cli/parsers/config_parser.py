@@ -1,7 +1,6 @@
 """Config subcommand - view and set configuration defaults."""
 
 import argparse
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from rich.text import Text
@@ -11,11 +10,17 @@ from gtasks.cli.errors import CliError
 from gtasks.utils.config import LEGACY_DEFAULT_TASKLIST_KEY, Config, ConfigKey
 
 if TYPE_CHECKING:
-    from gtasks.client.protocol import TasksClient
+    from gtasks.client.protocol import ClientProvider
 
 _DESCRIPTIONS: dict[ConfigKey, str] = {
     ConfigKey.ACTIVE_TASKLIST_ID: "ID of the list commands act on when no -l is given",
     ConfigKey.ACTIVE_TASKLIST_TITLE: "Display name of the active list",
+    ConfigKey.CACHE: "Reuse fetched lists and tasks for up to 30 minutes: on (default) or off",
+}
+
+# Keys that only accept these values; anything else is rejected before it's saved.
+_ALLOWED_VALUES: dict[ConfigKey, tuple[str, ...]] = {
+    ConfigKey.CACHE: ("on", "off"),
 }
 
 # Keys owned by another command; setting them by hand would let ID and title disagree.
@@ -32,9 +37,7 @@ def _setting_line(key: ConfigKey, value: str | None) -> Text:
     return Text.assemble((key.value, "heading"), " = ", shown)
 
 
-def cmd_config(
-    args: argparse.Namespace, get_client: "Callable[[], TasksClient]", cfg: Config
-) -> None:
+def cmd_config(args: argparse.Namespace, get_client: "ClientProvider", cfg: Config) -> None:
     """Handle the 'config' command to view or set configuration defaults.
 
     Never calls `get_client` - 'config' doesn't touch the API, so it works
@@ -62,6 +65,12 @@ def cmd_config(
     if config_key in _MANAGED_BY:
         command = _MANAGED_BY[config_key]
         raise CliError(f"'{config_key.value}' is set by `{command}`.", hint=f"Run `{command}`.")
+    allowed = _ALLOWED_VALUES.get(config_key)
+    if allowed is not None and args.value not in allowed:
+        raise CliError(
+            f"'{args.value}' isn't a valid value for '{config_key.value}'.",
+            hint=f"Use one of: {', '.join(allowed)}",
+        )
     cfg.set(config_key, args.value)
     ui.success(_setting_line(config_key, args.value))
 

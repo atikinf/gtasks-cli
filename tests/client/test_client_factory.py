@@ -4,7 +4,15 @@ from unittest.mock import MagicMock, mock_open, patch
 import pytest
 from google.auth.exceptions import RefreshError
 
-from gtasks.client.client_factory import SignInRequiredError, auth_from_file
+from gtasks.client.api_client import ApiClient
+from gtasks.client.cache_store import account_key
+from gtasks.client.caching_client import CachingClient
+from gtasks.client.client_factory import (
+    SignInRequiredError,
+    auth_from_file,
+    build_client,
+    build_tasks_resource,
+)
 
 
 class TestLoadCredentials:
@@ -241,3 +249,76 @@ class TestSignInRequired:
             pytest.raises(SignInRequiredError),
         ):
             auth_from_file(token_path, creds_path)
+
+
+class TestBuildClient:
+    @pytest.fixture
+    def creds(self) -> MagicMock:
+        return MagicMock(client_id="client", refresh_token="token")
+
+    @pytest.fixture(autouse=True)
+    def patched(self, creds: MagicMock):
+        with (
+            patch("gtasks.client.client_factory.auth_from_file", return_value=creds),
+            patch("gtasks.client.client_factory.build_tasks_resource") as build_resource,
+        ):
+            self.build_resource = build_resource
+            yield
+
+    def test_build_client_GIVEN_no_cache_dir_THEN_plain_api_client(self) -> None:
+        assert isinstance(build_client(), ApiClient)
+
+    def test_build_client_GIVEN_cache_dir_THEN_caching_client_for_this_account(
+        self, tmp_path: Path, creds: MagicMock
+    ) -> None:
+        client = build_client(cache_dir=tmp_path)
+
+        assert isinstance(client, CachingClient)
+        client._store.write_tasklists([])  # where it writes identifies the account
+        assert (tmp_path / account_key("client", "token")).is_dir()
+
+    def test_build_client_THEN_refetch_client_has_own_connection_with_timeout(
+        self, tmp_path: Path, creds: MagicMock
+    ) -> None:
+        client = build_client(cache_dir=tmp_path)
+        assert isinstance(client, CachingClient)
+
+        assert client._make_refresher is not None
+        refresher = client._make_refresher()  # what a concurrent refetch would use
+
+        assert isinstance(refresher, ApiClient)
+        assert self.build_resource.call_args_list[0].kwargs == {}
+        assert self.build_resource.call_args_list[1].args == (creds,)
+        assert self.build_resource.call_args_list[1].kwargs["timeout"] > 0
+
+    def test_build_client_GIVEN_fresh_THEN_passed_to_caching_client(
+        self, tmp_path: Path
+    ) -> None:
+        client = build_client(fresh=True, cache_dir=tmp_path)
+
+        assert isinstance(client, CachingClient)
+        assert client._fresh is True
+
+
+class TestBuildTasksResource:
+    @patch("gtasks.client.client_factory.build")
+    def test_GIVEN_no_timeout_THEN_default_connection(self, mock_build: MagicMock) -> None:
+        creds = MagicMock()
+
+        build_tasks_resource(creds)
+
+        mock_build.assert_called_once_with("tasks", "v1", credentials=creds)
+
+    @patch("gtasks.client.client_factory.build")
+    @patch("gtasks.client.client_factory.httplib2.Http")
+    @patch("gtasks.client.client_factory.AuthorizedHttp")
+    def test_GIVEN_timeout_THEN_new_connection_with_that_timeout(
+        self, mock_authed: MagicMock, mock_http: MagicMock, mock_build: MagicMock
+    ) -> None:
+        creds = MagicMock()
+
+        build_tasks_resource(creds, timeout=10)
+
+        mock_http.assert_called_once_with(timeout=10)
+        mock_authed.assert_called_once_with(creds, http=mock_http.return_value)
+        mock_build.assert_called_once_with("tasks", "v1", http=mock_authed.return_value)

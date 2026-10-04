@@ -11,6 +11,7 @@ from pytest import CaptureFixture
 from gtasks.app import main
 from gtasks.cli.errors import CliError
 from gtasks.client.client_factory import SignInRequiredError
+from gtasks.defaults import CACHE_DIR
 
 
 def _http_error(status: int) -> HttpError:
@@ -93,16 +94,18 @@ class TestMainErrorRouting:
         assert capsys.readouterr().err.startswith("error: credentials.json")
 
 
+@pytest.fixture
+def build_client(tmp_path: Path) -> Iterator[Mock]:
+    """Patch out sign-in entirely; yields the factory main() would call."""
+    with (
+        patch("gtasks.app.build_client") as build_client,
+        patch("gtasks.app.CONFIG_FILE_PATH", tmp_path / "config.toml"),
+    ):
+        yield build_client
+
+
 class TestMainClientConstruction:
     """The client (and so credentials/OAuth) is built only when a handler asks for it."""
-
-    @pytest.fixture
-    def build_client(self, tmp_path: Path) -> Iterator[Mock]:
-        with (
-            patch("gtasks.app.build_client") as build_client,
-            patch("gtasks.app.CONFIG_FILE_PATH", tmp_path / "config.toml"),
-        ):
-            yield build_client
 
     def test_main_GIVEN_auth_on_first_run_THEN_never_builds_client(
         self, build_client: Mock
@@ -117,29 +120,75 @@ class TestMainClientConstruction:
         assert code == 130  # reached auth's own prompt and the user cancelled
         build_client.assert_not_called()
 
+    def test_main_GIVEN_successful_auth_THEN_clears_cache(
+        self, build_client: Mock, tmp_path: Path
+    ) -> None:
+        cache_dir = tmp_path / "cache"
+        (cache_dir / "old-account").mkdir(parents=True)
+
+        with (
+            patch(
+                "gtasks.cli.parsers.auth_parser.prompt_setup_credentials",
+                return_value=("id", "secret"),
+            ),
+            patch("gtasks.cli.parsers.auth_parser.auth"),
+            patch("gtasks.cli.parsers.auth_parser.CACHE_DIR", cache_dir),
+        ):
+            assert main(["auth"]) == 0
+
+        assert not cache_dir.exists()
+        build_client.assert_not_called()
+
     def test_main_GIVEN_config_THEN_never_builds_client(self, build_client: Mock) -> None:
         build_client.side_effect = FileNotFoundError("credentials.json")
 
         assert main(["config"]) == 0
         build_client.assert_not_called()
 
-    def test_main_GIVEN_api_command_THEN_builds_client_once(self, build_client: Mock) -> None:
+    def test_main_GIVEN_api_command_THEN_builds_cached_client_once(
+        self, build_client: Mock
+    ) -> None:
         build_client.return_value.get_tasklists.return_value = []
 
         assert main(["lists"]) == 0
-        build_client.assert_called_once_with()
+        build_client.assert_called_once_with(fresh=False, cache_dir=CACHE_DIR)
+
+    @pytest.mark.parametrize(
+        "argv",
+        [["--refresh", "lists"], ["lists", "--refresh"], ["--refresh"]],
+        ids=["before", "after", "bare"],
+    )
+    def test_main_GIVEN_refresh_flag_THEN_fresh_client(
+        self, build_client: Mock, argv: list[str]
+    ) -> None:
+        build_client.return_value.get_tasklists.return_value = []
+        build_client.return_value.get_tasklist.return_value = {"id": "d", "title": "My Tasks"}
+        build_client.return_value.get_tasks.return_value = []
+        build_client.return_value.tasks_fetched_at.return_value = None
+
+        assert main(argv) == 0
+        assert build_client.call_args.kwargs["fresh"] is True
+
+    def test_main_GIVEN_done_THEN_fresh_client(self, build_client: Mock) -> None:
+        build_client.return_value.get_tasklist.return_value = {"id": "d", "title": "My Tasks"}
+        build_client.return_value.get_tasks.return_value = [{"id": "t", "title": "Milk"}]
+        build_client.return_value.complete_tasks.return_value = [{"id": "t", "title": "Milk"}]
+
+        assert main(["done", "Milk"]) == 0
+        build_client.assert_called_once_with(fresh=True, cache_dir=CACHE_DIR)
+
+    def test_main_GIVEN_cache_off_THEN_no_cache_dir(
+        self, build_client: Mock, tmp_path: Path
+    ) -> None:
+        (tmp_path / "config.toml").write_text("[DEFAULT]\ncache = off\n")
+        build_client.return_value.get_tasklists.return_value = []
+
+        assert main(["lists"]) == 0
+        build_client.assert_called_once_with(fresh=False, cache_dir=None)
 
 
 class TestMainSignInHint:
     """Every way of being signed out ends in the same pointer to `gtasks auth`."""
-
-    @pytest.fixture
-    def build_client(self, tmp_path: Path) -> Iterator[Mock]:
-        with (
-            patch("gtasks.app.build_client") as build_client,
-            patch("gtasks.app.CONFIG_FILE_PATH", tmp_path / "config.toml"),
-        ):
-            yield build_client
 
     @pytest.mark.parametrize(
         "argv",

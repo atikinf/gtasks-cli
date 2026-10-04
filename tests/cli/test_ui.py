@@ -75,6 +75,22 @@ class TestRenderTasks:
         assert "1+ open" in output
         assert "gtasks tasks" in output
 
+    @pytest.mark.parametrize(
+        "age, note",
+        [(None, None), (59, None), (60, "cached 1m ago"), (12 * 60 + 30, "cached 12m ago")],
+        ids=["live", "under-a-minute", "one-minute", "twelve-minutes"],
+    )
+    def test_render_tasks_GIVEN_cached_age_THEN_note_only_from_a_minute(
+        self, consoles: tuple[Console, Console], age: float | None, note: str | None
+    ) -> None:
+        ui.render_tasks([], heading="Groceries", cached_age=age, today=TODAY)
+
+        heading = _text(consoles[0]).splitlines()[0]
+        if note is None:
+            assert "cached" not in heading
+        else:
+            assert heading.endswith(f"Groceries · 0 open · {note}")
+
     def test_render_tasks_GIVEN_no_tasks_THEN_says_nothing_to_do(
         self, consoles: tuple[Console, Console]
     ) -> None:

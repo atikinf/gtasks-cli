@@ -20,6 +20,8 @@ gtasks delete "Buy milk"
 
 Commands act on the active list. Override it per command with `-l LIST`, or per shell with `GTASKS_LIST=LIST`. If no list is active, your default Google Tasks list is used.
 
+Lists and tasks are cached for up to 30 minutes (in `~/.cache/gtasks-cli`), so repeat listings are instant; a listing served from the cache says how old it is. Changes made in gtasks show up immediately. To see changes made elsewhere sooner, add `--refresh`, or turn caching off with `gtasks config cache off`.
+
 ### Development
 
 Install [`uv`](https://docs.astral.sh/uv/) (`brew install uv` on macOS), then from the repo root:

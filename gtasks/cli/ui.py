@@ -154,24 +154,34 @@ def _one_line(notes: str) -> str:
     return lines[0][: _NOTES_MAX - 1].rstrip() + "…"
 
 
+def _cached_note(age: float | None) -> str:
+    """` · cached 12m ago` for data at least a minute old; nothing for fresh data."""
+    if age is None or age < 60:
+        return ""
+    return f" · cached {int(age // 60)}m ago"
+
+
 def render_tasks(
     tasks: "list[Task]",
     *,
     heading: str | None = None,
     show_ids: bool = False,
     truncated: bool = False,
+    cached_age: float | None = None,
     today: date | None = None,
 ) -> None:
     """Print a numbered task table; numbers match what `done`/`delete` accept.
 
     `truncated` means more tasks exist than were passed (a --limit cut the list short).
+    `cached_age` is how many seconds old the data is if it came from the cache.
     """
     today = today or date.today()
 
     if heading is not None:
         open_count = sum(1 for t in tasks if t.get("status") != "completed")
         count = f"{open_count}+" if truncated else str(open_count)
-        out().print(Text.assemble(_INDENT, (heading, "heading"), (f" · {count} open", "muted")))
+        details = f" · {count} open{_cached_note(cached_age)}"
+        out().print(Text.assemble(_INDENT, (heading, "heading"), (details, "muted")))
 
     if not tasks:
         out().print(Text(f"{_INDENT} Nothing to do.", style="muted"))

@@ -1,7 +1,9 @@
-"""Interactive prompts and input validation."""
+"""Interactive prompts, input validation and shared argparse options."""
 
+import argparse
 import re
 from collections.abc import Callable
+from typing import Any
 
 HINT = "Please choose a number between 1 and {num_options} or 'q' to cancel."
 
@@ -75,3 +77,35 @@ def prompt_index_choice(
             return choice - 1  # Convert to 0-based index
 
         print("Out of range. " + HINT.format(num_options=num_options))
+
+
+def add_shared_option(
+    parser: argparse.ArgumentParser,
+    *flags: str,
+    top_level: bool,
+    default: Any,
+    **kwargs: Any,
+) -> None:
+    """Register an option accepted both before and after the subcommand.
+
+    Register it on the top-level parser (`top_level=True`, which owns `default`) and on each
+    subparser. Subparser copies default to SUPPRESS: otherwise their default would overwrite
+    a value given before the subcommand, as in `gtasks -l Work done 1`.
+    """
+    parser.add_argument(
+        *flags,
+        default=default if top_level else argparse.SUPPRESS,
+        **kwargs,
+    )
+
+
+def add_refresh_option(parser: argparse.ArgumentParser, *, top_level: bool = False) -> None:
+    """Register --refresh: ignore cached data and fetch everything fresh."""
+    add_shared_option(
+        parser,
+        "--refresh",
+        top_level=top_level,
+        default=False,
+        action="store_true",
+        help="ignore cached data and fetch fresh from Google Tasks",
+    )

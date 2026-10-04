@@ -1,18 +1,18 @@
 """Add subcommand - add a new task."""
 
 import argparse
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import dateparser
 
 from gtasks.cli import ui
+from gtasks.cli.cli_utils import add_refresh_option
 from gtasks.cli.errors import CliError
 from gtasks.cli.title_id_resolution import add_tasklist_option, resolve_target_tasklist
 from gtasks.utils.config import Config
 
 if TYPE_CHECKING:
-    from gtasks.client.protocol import TasksClient
+    from gtasks.client.protocol import ClientProvider
 
 
 def parse_due_date(date_str: str) -> str:
@@ -35,9 +35,7 @@ def parse_due_date(date_str: str) -> str:
     return dt.strftime("%Y-%m-%dT00:00:00.000Z")
 
 
-def cmd_add_task(
-    args: argparse.Namespace, get_client: "Callable[[], TasksClient]", cfg: Config
-) -> None:
+def cmd_add_task(args: argparse.Namespace, get_client: "ClientProvider", cfg: Config) -> None:
     """Handle the 'add' command to create a new task."""
     # Parse the date before touching the API so a typo fails fast.
     try:
@@ -83,4 +81,5 @@ def add_subparser_add_task(subparsers) -> None:
         default=None,
         help="Due date (natural language e.g. 'tomorrow', 'next friday', '2026-05-01')",
     )
+    add_refresh_option(add_parser)
     add_parser.set_defaults(func=cmd_add_task)

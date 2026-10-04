@@ -2,6 +2,7 @@
 
 import argparse
 
+from gtasks.cli.cli_utils import add_refresh_option
 from gtasks.cli.parsers.add_parser import add_subparser_add_task
 from gtasks.cli.parsers.auth_parser import add_subparser_auth
 from gtasks.cli.parsers.config_parser import add_subparser_config
@@ -30,6 +31,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # -l works before any subcommand too: `gtasks -l Work` or `gtasks -l Work done 1`.
     add_tasklist_option(parser, top_level=True)
+    add_refresh_option(parser, top_level=True)
 
     # Default: bare `gtasks` shows the first 10 tasks from the active list.
     parser.set_defaults(
