@@ -16,6 +16,8 @@ HEAVY = (
     "httplib2",
     "dateparser",
     "argcomplete",  # only while the shell asks for completions
+    "mcp",  # the MCP server (`gtasks-mcp`) only, never the CLI
+    "pydantic",
 )
 
 

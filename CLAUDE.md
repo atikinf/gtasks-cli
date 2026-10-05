@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 uv sync --dev                      # install deps (Python >= 3.14)
 uv run gtasks/app.py tasks         # run the CLI from source
+uv run gtasks-mcp                  # run the MCP server (stdio) from source
 uv run pytest                      # run all tests
 uv run pytest tests/client/test_api_client.py::TestGetTasklists  # single class/test
 uv run pytest --cov=gtasks         # coverage (pytest-cov installed)
@@ -119,6 +120,20 @@ batching — and no user-facing policy (matching, filtering): each method maps t
 operation (or a batch of one), named after the resource (`update_task`, `update_tasklist`).
 Unset optionals go through `_given()` so they're left out of the request: a `None` body field
 would be sent as JSON null, which a patch treats as "clear".
+
+**MCP server.** `gtasks/mcp_server/server.py` (`gtasks-mcp`, the optional `mcp` extra, SDK v2
+`MCPServer`) is a sibling of `cli/` that depends on `client/` only: tools take and return API
+IDs, so none of the title matching, listing numbers or prompts apply. stdout is the protocol
+stream, so it never uses `ui`, and builds clients with `build_client(allow_sign_in=False)`
+(signed out → `SignInRequiredError`, never the browser flow). Sync tools run on worker threads,
+so every call builds its own client, under a lock. Client errors become `ToolError`s via
+`_client_errors` (anything else reaches the model as a bare "Error executing tool"). Dates in
+and out are strict `YYYY-MM-DD`; `list_tasks` filters client-side so the open-tasks cache still
+serves it, and caps results across lists (`limit`, oldest/earliest-due first when filtering,
+per-list `total`, shortened notes; `get_task` has them in full) since a full account runs to
+~100 KB. `build_server(get_client)` takes the provider, so tests pass `lambda **_: mock` and
+drive tools through `server.call_tool` (anyio). `test_startup.py` keeps `mcp`/`pydantic` out of
+the CLI's imports.
 
 **Contract layer.** `client/protocol.py` defines `TasksClient`, a structural `Protocol` mirroring
 `ApiClient`'s full public surface (14 methods, grouped by resource — tasklist reads/writes, task

@@ -37,6 +37,24 @@ gtasks completion fish | source     # ~/.config/fish/config.fish
 
 Completion matches the start of a title, ignoring case, and uses the local cache only (so it's instant and works offline); if the cache has expired, run any listing to refresh it. In zsh and fish, tasks show their due date alongside.
 
+### Use from Claude (MCP)
+
+`gtasks-mcp` is an [MCP](https://modelcontextprotocol.io) server that lets Claude Code or Claude Desktop read and manage your tasks ("do I have any old outstanding tasks?"). Sign in with `gtasks auth` first: the server never opens a browser itself.
+
+Claude Code, running from a checkout:
+
+```
+claude mcp add gtasks -- uv run --directory /path/to/gtasks-cli gtasks-mcp
+```
+
+Or install it with the `mcp` extra (`uv tool install --reinstall '/path/to/gtasks-cli[mcp]'`, which also updates an existing `gtasks` install) and point any MCP host at `gtasks-mcp`. GUI apps don't see your shell's `PATH`, so give Claude Desktop the full path in `claude_desktop_config.json`:
+
+```json
+{ "mcpServers": { "gtasks": { "command": "/Users/<you>/.local/bin/gtasks-mcp" } } }
+```
+
+Tools: `list_tasklists`, `list_tasks` (one list or all; filters for overdue and not-recently-updated, oldest first, capped by `limit`), `get_task`, `add_tasks`, `update_task`, `complete_tasks`, `reopen_tasks`, `delete_tasks`, `move_task`, `create_tasklist`. It shares the CLI's sign-in, cache and active list (`gtasks use`).
+
 ### Development
 
 Install [`uv`](https://docs.astral.sh/uv/) (`brew install uv` on macOS), then from the repo root:

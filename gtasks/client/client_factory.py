@@ -64,13 +64,15 @@ def build_client(
     cache_dir: Path | None = None,
     token_path: Path = APP_CFG_PATH / "token.pickle",
     creds_path: Path = APP_CFG_PATH / "credentials.json",
+    allow_sign_in: bool = True,
 ) -> TasksClient:
     """Sign in and build the client: cached under `cache_dir` if given, else plain.
 
     Credentials are loaded (and refreshed if expired) once, before any client is built, so
     the main client and a concurrent refetch never race to refresh the same token.
+    `allow_sign_in=False` never starts the browser flow (see `auth_from_file`).
     """
-    creds: Credentials = auth_from_file(token_path, creds_path)
+    creds: Credentials = auth_from_file(token_path, creds_path, allow_sign_in=allow_sign_in)
     if cache_dir is None:
         return ApiClient(build_tasks_resource(creds))
 
@@ -146,12 +148,21 @@ def auth(token_path: Path, client_id: str, client_secret: str) -> Credentials:
     )
 
 
-def auth_from_file(token_path: Path, creds_path: Path) -> Credentials:
-    """Authenticate using a `credentials.json` file (used by `build_client`)."""
+def auth_from_file(
+    token_path: Path, creds_path: Path, *, allow_sign_in: bool = True
+) -> Credentials:
+    """Authenticate using a `credentials.json` file (used by `build_client`).
+
+    With `allow_sign_in=False`, a missing or dead token raises `SignInRequiredError` instead
+    of running the browser flow, for callers with no user at a terminal (the MCP server,
+    whose stdout the flow's prompts would corrupt).
+    """
 
     def build_flow() -> InstalledAppFlow:
         from google_auth_oauthlib.flow import InstalledAppFlow
 
+        if not allow_sign_in:
+            raise SignInRequiredError("No usable saved sign-in")
         try:
             return InstalledAppFlow.from_client_secrets_file(str(creds_path), SCOPES)
         except FileNotFoundError as e:

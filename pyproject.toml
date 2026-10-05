@@ -27,6 +27,13 @@ dependencies = [
 
 [project.scripts]
 gtasks = "gtasks.app:main"
+gtasks-mcp = "gtasks.mcp_server.server:main"
+
+[project.optional-dependencies]
+# The MCP server (`gtasks-mcp`), for LLM hosts such as Claude Code or Claude Desktop.
+mcp = [
+    "mcp>=2.3,<3",
+]
 
 # uv looks in src/gtasks_cli/__init__.py by default
 [tool.uv.build-backend]
@@ -49,6 +56,8 @@ known-first-party = ["gtasks"]
 
 [dependency-groups]
 dev = [
+    "gtasks-cli[mcp]",
+    "anyio>=4",
     "pytest>=9.0.2",
     "ruff>=0.15.11",
     "types-dateparser>=1.4.0.20260408",

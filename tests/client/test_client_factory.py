@@ -250,6 +250,40 @@ class TestSignInRequired:
         ):
             auth_from_file(token_path, creds_path)
 
+    @patch("google_auth_oauthlib.flow.InstalledAppFlow")
+    def test_auth_from_file_GIVEN_no_token_and_sign_in_not_allowed_THEN_no_flow(
+        self, mock_flow_class: MagicMock, token_path: Path, creds_path: Path
+    ) -> None:
+        with (
+            patch.object(Path, "exists", return_value=False),
+            pytest.raises(SignInRequiredError),
+        ):
+            auth_from_file(token_path, creds_path, allow_sign_in=False)
+
+        mock_flow_class.from_client_secrets_file.assert_not_called()
+
+    @patch("google_auth_oauthlib.flow.InstalledAppFlow")
+    @patch("gtasks.client.client_factory.pickle")
+    def test_auth_from_file_GIVEN_refresh_fails_and_sign_in_not_allowed_THEN_no_flow(
+        self,
+        mock_pickle: MagicMock,
+        mock_flow_class: MagicMock,
+        token_path: Path,
+        creds_path: Path,
+    ) -> None:
+        dead_creds = MagicMock(valid=False, expired=True, refresh_token="revoked")
+        dead_creds.refresh.side_effect = RefreshError("invalid_grant")
+        mock_pickle.load.return_value = dead_creds
+
+        with (
+            patch.object(Path, "exists", return_value=True),
+            patch.object(Path, "open", mock_open()),
+            pytest.raises(SignInRequiredError),
+        ):
+            auth_from_file(token_path, creds_path, allow_sign_in=False)
+
+        mock_flow_class.from_client_secrets_file.assert_not_called()
+
 
 class TestBuildClient:
     @pytest.fixture
