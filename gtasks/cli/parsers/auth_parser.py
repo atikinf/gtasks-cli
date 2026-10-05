@@ -9,14 +9,11 @@ from gtasks.cli.cli_utils import prompt_setup_credentials
 from gtasks.cli.errors import Cancelled
 from gtasks.client.cache_store import clear_cache
 from gtasks.client.client_factory import auth
-from gtasks.defaults import APP_CFG_PATH
+from gtasks.defaults import TOKEN_PATH
 from gtasks.utils.config import Config
 
 if TYPE_CHECKING:
     from gtasks.client.protocol import ClientProvider
-
-TOKEN_PATH = APP_CFG_PATH / "token.pickle"
-
 
 _SETUP_INSTRUCTIONS = """
 To use gtasks, you need a Google OAuth client ID and secret.

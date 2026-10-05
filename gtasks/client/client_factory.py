@@ -4,7 +4,9 @@ The Google libraries are imported inside the functions that use them, never at m
 together they take ~0.4 s to import, and a command served from the cache never needs them.
 """
 
-import pickle
+import json
+import os
+import tempfile
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -13,7 +15,7 @@ from gtasks.client.api_client import ApiClient
 from gtasks.client.cache_store import CacheStore, account_key
 from gtasks.client.caching_client import CachingClient
 from gtasks.client.protocol import TasksClient
-from gtasks.defaults import APP_CFG_PATH
+from gtasks.defaults import APP_CFG_PATH, TOKEN_PATH
 
 if TYPE_CHECKING:
     from google.oauth2.credentials import Credentials
@@ -62,7 +64,7 @@ def build_client(
     *,
     fresh: bool = False,
     cache_dir: Path | None = None,
-    token_path: Path = APP_CFG_PATH / "token.pickle",
+    token_path: Path = TOKEN_PATH,
     creds_path: Path = APP_CFG_PATH / "credentials.json",
     allow_sign_in: bool = True,
 ) -> TasksClient:
@@ -99,11 +101,7 @@ def _load_or_refresh_creds(
     from google.auth.exceptions import RefreshError
     from google.auth.transport.requests import Request
 
-    creds: Credentials | None = None
-
-    if token_path.exists():
-        with token_path.open("rb") as token_file:
-            creds = pickle.load(token_file)
+    creds = read_creds_from_file(token_path)
 
     if creds and creds.valid:
         return creds
@@ -171,9 +169,53 @@ def auth_from_file(
     return _load_or_refresh_creds(token_path, build_flow)
 
 
-def write_creds_to_file(creds: Credentials, token_path: Path) -> None:
-    # Ensure parent directory exists (e.g. ~/.config/gtasks-cli)
-    token_path.parent.mkdir(parents=True, exist_ok=True)
+def read_creds_from_file(token_path: Path) -> Credentials | None:
+    """The saved sign-in, or None if there's none or it can't be read (so: sign in again).
 
-    with token_path.open("wb") as token_file:
-        pickle.dump(creds, token_file)
+    JSON rather than a pickle: a pickle names google-auth's internal modules, so a token saved
+    by one google-auth version may not load in another (an installed gtasks and a checkout).
+    A token from before the switch is migrated the first time it's read.
+    """
+    from google.oauth2.credentials import Credentials
+
+    if not token_path.exists():
+        return _migrate_legacy_token(token_path)
+    try:
+        info = json.loads(token_path.read_text())
+        return Credentials.from_authorized_user_info(info, SCOPES)
+    except (OSError, ValueError, TypeError, AttributeError):
+        return None  # unreadable, corrupt, or missing required fields
+
+
+def _migrate_legacy_token(token_path: Path) -> Credentials | None:
+    """Convert a `token.pickle` saved next to `token_path` by an earlier gtasks to JSON.
+
+    One that won't load (e.g. pickled by another google-auth version) is left in place for
+    whichever install wrote it; this one then signs in afresh.
+    """
+    import pickle
+
+    legacy_path = token_path.with_suffix(".pickle")
+    try:
+        with legacy_path.open("rb") as legacy_file:
+            creds = pickle.load(legacy_file)
+        # Same account (client ID and refresh token), so the cache carries over too.
+        write_creds_to_file(creds, token_path)
+    except Exception:
+        return None
+    legacy_path.unlink(missing_ok=True)
+    return creds
+
+
+def write_creds_to_file(creds: Credentials, token_path: Path) -> None:
+    """Save the sign-in atomically and owner-only (0600): it grants access to the account."""
+    token_path.parent.mkdir(parents=True, exist_ok=True)
+    # mkstemp creates the file 0600; the rename means no reader ever sees half a token.
+    fd, tmp = tempfile.mkstemp(dir=token_path.parent, prefix=".tmp-token-", suffix=".json")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(creds.to_json())
+        os.replace(tmp, token_path)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise

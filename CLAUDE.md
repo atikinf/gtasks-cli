@@ -162,7 +162,12 @@ reads.
   refuses to set those (`_MANAGED_BY`) — only `use` writes them. `cache` is `on` (default) or
   `off`.
 - `credentials.json` — user-supplied OAuth client secrets from Google Cloud Console.
-- `token.pickle` — pickled `Credentials`, refreshed automatically when expired.
+- `token.json` — the saved sign-in in Google's authorized-user format (`Credentials.to_json()`),
+  written atomically and 0600, refreshed automatically when expired. Not a pickle: a pickle
+  names google-auth internals, so it can fail to load under another google-auth version (an
+  installed gtasks vs. a checkout). A legacy `token.pickle` is migrated on first read and
+  removed; one that won't load is left alone and gtasks signs in afresh. An unreadable
+  `token.json` likewise reads as signed out.
 
 Everything gtasks manages itself (disposable, never configuration) lives apart, in
 `$XDG_CACHE_HOME/gtasks-cli` (default `~/.cache/gtasks-cli`, see `defaults.CACHE_DIR`):
