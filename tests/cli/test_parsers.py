@@ -15,7 +15,7 @@ from gtasks.cli.parsers.config_parser import cmd_config
 from gtasks.cli.parsers.delete_parser import cmd_delete
 from gtasks.cli.parsers.done_parser import cmd_done
 from gtasks.cli.parsers.lists_parser import cmd_list_tasklists
-from gtasks.cli.parsers.tasks_parser import cmd_list_tasks
+from gtasks.cli.parsers.tasks_parser import DEFAULT_LIMIT, cmd_list_tasks
 from gtasks.cli.parsers.use_parser import cmd_use
 from gtasks.client.protocol import CacheState
 from gtasks.utils.config import Config, ConfigKey
@@ -530,6 +530,11 @@ class TestCmdListTasklists:
 class TestCmdUse:
     """Test the cmd_use command handler."""
 
+    @pytest.fixture(autouse=True)
+    def no_tasks(self, mock_client: Mock) -> None:
+        # `use` shows the new active list after switching.
+        mock_client.get_tasks.return_value = []
+
     def test_cmd_use_GIVEN_name_THEN_stores_id_and_canonical_title(
         self, mock_client: Mock, config: Config, capsys: CaptureFixture
     ) -> None:
@@ -550,6 +555,7 @@ class TestCmdUse:
             cmd_use(argparse.Namespace(name="Nope"), lambda **_: mock_client, active_config)
 
         assert active_config.get(ConfigKey.ACTIVE_TASKLIST_ID) == "list1"
+        mock_client.get_tasks.assert_not_called()
 
     def test_cmd_use_GIVEN_no_name_THEN_picks_interactively(
         self, mock_client: Mock, config: Config
@@ -580,6 +586,46 @@ class TestCmdUse:
             cmd_use(argparse.Namespace(name=None), lambda **_: mock_client, config)
 
         assert config.get(ConfigKey.ACTIVE_TASKLIST_ID) is None
+        mock_client.get_tasks.assert_not_called()
+
+    def test_cmd_use_GIVEN_name_THEN_shows_list(
+        self, mock_client: Mock, config: Config, capsys: CaptureFixture
+    ) -> None:
+        mock_client.get_tasklists.return_value = [ACTIVE]
+        mock_client.get_tasks.return_value = [{"id": "t1", "title": "Ship it"}]
+        get_client = Mock(return_value=mock_client)
+
+        cmd_use(argparse.Namespace(name="work"), get_client, config)
+
+        get_client.assert_called_once_with()  # cached like bare `gtasks`; --refresh forces fresh
+        mock_client.get_tasks.assert_called_once_with(
+            "list1", DEFAULT_LIMIT + 1, show_completed=False
+        )
+        lines = [line.strip() for line in capsys.readouterr().out.splitlines()]
+        assert lines[0] == "✓ Active list: Work"
+        assert lines[1].startswith("Work · 1 open")
+        assert "Ship it" in lines[2]
+
+    def test_cmd_use_GIVEN_picker_choice_THEN_shows_chosen_list(
+        self, mock_client: Mock, config: Config
+    ) -> None:
+        mock_client.get_tasklists.return_value = [ACTIVE, {"id": "list2", "title": "Home"}]
+
+        with patch("builtins.input", return_value="2"):
+            cmd_use(argparse.Namespace(name=None), lambda **_: mock_client, config)
+
+        assert mock_client.get_tasks.call_args.args[0] == "list2"
+
+    def test_cmd_use_THEN_records_listing_for_numbers(
+        self, mock_client: Mock, config: Config
+    ) -> None:
+        mock_client.get_tasklists.return_value = [ACTIVE]
+        mock_client.get_tasks.return_value = [{"id": "t1", "title": "Ship it"}]
+
+        cmd_use(argparse.Namespace(name="Work"), lambda **_: mock_client, config)
+
+        # So `done 1` right after hits the task `use` showed as 1.
+        assert ListingState.default().rows("list1") == [{"id": "t1", "title": "Ship it"}]
 
 
 class TestCmdConfig:

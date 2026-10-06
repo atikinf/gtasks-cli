@@ -10,11 +10,9 @@ from gtasks.cli.parsers.config_parser import add_subparser_config
 from gtasks.cli.parsers.delete_parser import add_subparser_delete
 from gtasks.cli.parsers.done_parser import add_subparser_done
 from gtasks.cli.parsers.lists_parser import add_subparser_lists
-from gtasks.cli.parsers.tasks_parser import add_subparser_tasks, cmd_list_tasks
+from gtasks.cli.parsers.tasks_parser import DEFAULT_LIMIT, add_subparser_tasks, cmd_list_tasks
 from gtasks.cli.parsers.use_parser import add_subparser_use
 from gtasks.cli.title_id_resolution import add_tasklist_option
-
-_DEFAULT_LIMIT = 10
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -37,7 +35,7 @@ def build_parser() -> argparse.ArgumentParser:
     # Default: bare `gtasks` shows the first 10 tasks from the active list.
     parser.set_defaults(
         func=cmd_list_tasks,
-        limit=_DEFAULT_LIMIT,
+        limit=DEFAULT_LIMIT,
         show_ids=False,
     )
 

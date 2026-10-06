@@ -9,7 +9,8 @@ from gtasks.cli import ui
 from gtasks.cli.cli_utils import add_refresh_option, prompt_index_choice
 from gtasks.cli.completion import attach, complete_tasklists
 from gtasks.cli.errors import Cancelled, CliError
-from gtasks.cli.title_id_resolution import find_tasklist, set_active_tasklist
+from gtasks.cli.parsers.tasks_parser import DEFAULT_LIMIT, show_tasks
+from gtasks.cli.title_id_resolution import TargetList, find_tasklist, set_active_tasklist
 from gtasks.utils.config import Config, ConfigKey
 
 if TYPE_CHECKING:
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
 
 
 def cmd_use(args: argparse.Namespace, get_client: "ClientProvider", cfg: Config) -> None:
-    """Handle the 'use' command to set the active task list."""
+    """Handle the 'use' command to set the active task list, then show it."""
     client = get_client()
     if args.name is None:
         tasklists = client.get_tasklists()
@@ -39,6 +40,11 @@ def cmd_use(args: argparse.Namespace, get_client: "ClientProvider", cfg: Config)
     set_active_tasklist(cfg, tasklist)
     ui.success(Text.assemble("Active list: ", (tasklist.get("title", ""), "heading")))
 
+    # Show the list as bare `gtasks` would (from the cache unless --refresh), and number it
+    # for `done 3`.
+    target = TargetList(tasklist["id"], tasklist.get("title", ""))
+    show_tasks(client, target, limit=DEFAULT_LIMIT)
+
 
 def add_subparser_use(subparsers) -> None:
     """Add the 'use' subcommand to set the active task list."""
@@ -46,8 +52,8 @@ def add_subparser_use(subparsers) -> None:
         "use",
         help="Set the active task list",
         description=(
-            "Set the task list that commands act on when no -l/--list is given. "
-            "Pick interactively if no name is given."
+            "Set the task list that commands act on when no -l/--list is given, then show "
+            "its first tasks. Pick interactively if no name is given."
         ),
     )
     name_arg = use_parser.add_argument(

@@ -12,7 +12,7 @@ You need your own Google OAuth client: in the [Google Cloud console](https://con
 gtasks                    # first 10 open tasks in the active list
 gtasks tasks              # all open tasks
 gtasks lists              # all task lists (● marks the active one)
-gtasks use Work           # set the active list (omit the name to pick interactively)
+gtasks use Work           # set the active list and show it (omit the name to pick)
 gtasks add "Buy milk" -d "next fri" -n "2%"
 gtasks done 1 3           # by the numbers shown in the last listing, or by title
 gtasks done milk          # part of a title works too, if only one task matches

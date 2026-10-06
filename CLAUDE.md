@@ -36,7 +36,10 @@ never do. So the client â€” and with it credential loading and the OAuth flow â€
 commands that need it: never for `--help` or invalid invocations, and never for `auth` (which
 creates those credentials) or `config`. Tests pass `lambda **_: mock_client`.
 To add a command: write the module pair, then register it in `build_parser`. Bare `gtasks` is
-handled by a top-level `set_defaults` pointing at `cmd_list_tasks` with `limit=10`.
+handled by a top-level `set_defaults` pointing at `cmd_list_tasks` with
+`limit=tasks_parser.DEFAULT_LIMIT` (10). The listing itself is `tasks_parser.show_tasks` (fetch,
+render, record the listing for numbers), shared by `tasks`, bare `gtasks` and `use`, which shows
+the newly active list right after switching (cached like bare `gtasks`; `--refresh` for fresh).
 
 **Which list a command acts on.** Every list-scoped handler calls
 `title_id_resolution.resolve_target_tasklist`, whose precedence is: `-l/--list` flag >

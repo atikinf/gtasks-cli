@@ -5,32 +5,46 @@ from typing import TYPE_CHECKING
 
 from gtasks.cli import ui
 from gtasks.cli.cli_utils import add_refresh_option
-from gtasks.cli.title_id_resolution import add_tasklist_option, resolve_target_tasklist
+from gtasks.cli.title_id_resolution import (
+    TargetList,
+    add_tasklist_option,
+    resolve_target_tasklist,
+)
 from gtasks.utils.config import Config
 from gtasks.utils.listing_state import ListingState
 
 if TYPE_CHECKING:
-    from gtasks.client.protocol import ClientProvider
+    from gtasks.client.protocol import ClientProvider, TasksClient
+
+# How many tasks the at-a-glance view shows: bare `gtasks`, and `use` after switching.
+DEFAULT_LIMIT = 10
 
 
 def cmd_list_tasks(args: argparse.Namespace, get_client: "ClientProvider", cfg: Config) -> None:
     """Handle the 'tasks' command (and bare `gtasks`) to display open tasks."""
     client = get_client()
     target = resolve_target_tasklist(args, client, cfg)
+    show_tasks(client, target, limit=args.limit, show_ids=args.show_ids)
 
+
+def show_tasks(
+    client: "TasksClient", target: TargetList, *, limit: int | None, show_ids: bool = False
+) -> None:
+    """Fetch and print a list's open tasks, and record the listing so `done 3` / `delete 3`
+    hit what was shown."""
     # TODO: "show completed" mode — fetch needsAction tasks here, then read
     # recently completed tasks from a local cache (populated by `gtasks done`)
     # to append as strikethrough, avoiding a second API call. Configurable via `gtasks config`.
     # Fetch one extra row to learn whether the limit hid anything.
-    fetch_limit = args.limit + 1 if args.limit is not None else None
+    fetch_limit = limit + 1 if limit is not None else None
     tasks = client.get_tasks(target.id, fetch_limit, show_completed=False)
-    truncated = args.limit is not None and len(tasks) > args.limit
-    tasks = tasks[: args.limit] if truncated else tasks
+    truncated = limit is not None and len(tasks) > limit
+    tasks = tasks[:limit] if truncated else tasks
 
     ui.render_tasks(
         tasks,
         heading=target.title,
-        show_ids=args.show_ids,
+        show_ids=show_ids,
         truncated=truncated,
         cache=client.tasks_cache_state(target.id),
     )
