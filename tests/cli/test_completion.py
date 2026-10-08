@@ -36,10 +36,8 @@ def store() -> CacheStore:
 
 
 @pytest.fixture
-def config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Config:
-    path = tmp_path / "config.toml"
-    monkeypatch.setattr(defaults, "CONFIG_FILE_PATH", path)
-    return Config(path)
+def config() -> Config:
+    return Config(defaults.config_file())
 
 
 def _args(**kwargs) -> argparse.Namespace:

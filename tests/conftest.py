@@ -30,7 +30,8 @@ def plain_output_and_clean_env(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> Iterator[None]:
     monkeypatch.delenv(ENV_VAR, raising=False)
-    # Files gtasks manages itself (e.g. the last listing) must never touch the real ~/.cache.
+    # Never the real ~/.config (settings, sign-in) or ~/.cache (cache, last listing).
+    monkeypatch.setattr(defaults, "CONFIG_DIR", tmp_path / "config")
     monkeypatch.setattr(defaults, "CACHE_DIR", tmp_path / "cache")
     ui.use_consoles(_plain_console(), _plain_console(stderr=True))
     yield

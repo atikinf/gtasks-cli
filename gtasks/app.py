@@ -11,7 +11,6 @@ from gtasks.cli import ui
 from gtasks.cli.cli import build_parser
 from gtasks.cli.errors import Cancelled, CliError
 from gtasks.client.client_factory import SignInRequiredError, build_client
-from gtasks.defaults import CONFIG_FILE_PATH
 from gtasks.utils.config import Config, ConfigKey
 
 if TYPE_CHECKING:
@@ -72,7 +71,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        cfg = Config(CONFIG_FILE_PATH)
+        cfg = Config.default()
         cache_dir = None if cfg.get(ConfigKey.CACHE) == "off" else defaults.CACHE_DIR
         force_fresh = getattr(args, "refresh", False)
 

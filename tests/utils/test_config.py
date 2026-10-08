@@ -1,8 +1,11 @@
+import subprocess
+import sys
 from configparser import ConfigParser
 from pathlib import Path
 
 import pytest
 
+from gtasks import defaults
 from gtasks.utils.config import Config, ConfigKey
 
 LIST_TITLE = "ToDo"
@@ -96,3 +99,46 @@ class TestParserIsolation:
         first.set(ConfigKey.ACTIVE_TASKLIST_TITLE, LIST_TITLE)
 
         assert second.get(ConfigKey.ACTIVE_TASKLIST_TITLE) is None
+
+
+class TestDefaultConfig:
+    def test_default_GIVEN_legacy_config_toml_THEN_renamed_to_ini_with_contents(self) -> None:
+        legacy = defaults.CONFIG_DIR / defaults.LEGACY_CONFIG_FILE_NAME
+        legacy.parent.mkdir(parents=True)
+        legacy.write_text("[DEFAULT]\ncache = off\n")
+
+        config = Config.default()
+
+        assert config.get(ConfigKey.CACHE) == "off"
+        assert config.path == defaults.config_file()
+        assert defaults.config_file().exists()
+        assert not legacy.exists()
+
+    def test_default_GIVEN_both_files_THEN_ini_wins_and_legacy_untouched(self) -> None:
+        legacy = defaults.CONFIG_DIR / defaults.LEGACY_CONFIG_FILE_NAME
+        legacy.parent.mkdir(parents=True)
+        legacy.write_text("[DEFAULT]\ncache = off\n")
+        defaults.config_file().write_text("[DEFAULT]\ncache = on\n")
+
+        assert Config.default().get(ConfigKey.CACHE) == "on"
+        assert legacy.exists()
+
+    def test_default_GIVEN_no_file_THEN_empty_config_at_ini_path(self) -> None:
+        config = Config.default()
+
+        assert config.path == defaults.config_file()
+        assert config.get(ConfigKey.CACHE) is None
+
+
+class TestConfigDir:
+    def test_GIVEN_xdg_config_home_THEN_config_dir_under_it(self, tmp_path: Path) -> None:
+        # In a subprocess: the test process's `defaults` is already imported (and overridden).
+        code = "from gtasks import defaults; print(defaults.CONFIG_DIR)"
+        env = {"XDG_CONFIG_HOME": str(tmp_path), "HOME": str(tmp_path / "home")}
+        out = subprocess.run(
+            [sys.executable, "-c", code], capture_output=True, text=True, check=True,
+            env=env,
+        ).stdout.strip()
+
+        assert out == str(tmp_path / "gtasks-cli")
+

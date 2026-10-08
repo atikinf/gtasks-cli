@@ -101,7 +101,8 @@ end in a `gtasks auth` hint via `_report_signed_out`: `SignInRequiredError` (rai
 `cli/`. A failed token refresh falls back to a fresh sign-in, so `gtasks auth` can always
 replace a revoked token.
 `tests/conftest.py` installs plain, uncoloured consoles (via `ui.use_consoles`), clears
-`$GTASKS_LIST` and points `defaults.CACHE_DIR` at a tmp dir for every test, so output assertions
+`$GTASKS_LIST` and points `defaults.CONFIG_DIR` and `defaults.CACHE_DIR` at tmp dirs for every
+test, so output assertions
 hold under `FORCE_COLOR`/`-s` and nothing touches the real `~/.cache`.
 
 **Cache.** Unless `cache = off`, `build_client` wraps `ApiClient` in
@@ -166,10 +167,14 @@ no setup. This keeps CLI code decoupled from the concrete implementation: `Cachi
 satisfies the same contract, so swapping it in needed no handler changes beyond asking for fresh
 reads.
 
-## On-disk state (`~/.config/gtasks-cli/` and `~/.cache/gtasks-cli/`, see `defaults.py`)
+## On-disk state (`defaults.py`)
 
-- `config.toml` — despite the extension this is **INI**, written by `ConfigParser` via
-  `utils/config.py:Config`. Settings are declared in the `ConfigKey` enum; adding a key means
+Configuration lives in `$XDG_CONFIG_HOME/gtasks-cli` (default `~/.config/gtasks-cli`,
+`defaults.CONFIG_DIR`; files via `defaults.config_file()` / `token_file()` /
+`credentials_file()`):
+
+- `config.ini` — written by `ConfigParser` via `utils/config.py:Config`; open it with
+  `Config.default()`, which renames the pre-rename `config.toml` (also INI) on first use. Settings are declared in the `ConfigKey` enum; adding a key means
   adding an enum member plus a description in `config_parser.py:_DESCRIPTIONS` (and its allowed
   values in `_ALLOWED_VALUES`, if restricted). The active list lives here as
   `active_tasklist_id` + `active_tasklist_title` (display cache, refreshed by `lists`); `config`
@@ -197,9 +202,10 @@ All of these follow `utils/json_files.py`: a semver `schema` per file (readers a
 MAJOR and treat anything else as missing — bump MAJOR for shape/meaning changes, MINOR for added
 fields), atomic owner-only writes, and unreadable/corrupt files reading as missing and failed
 writes being skipped, so they can never break a command. `gtasks auth` clears the whole folder.
-New app-managed files should go here and use the same helpers. Always read the location as
-`defaults.CACHE_DIR` at call time (never `from gtasks.defaults import CACHE_DIR`), so the single
-override in `tests/conftest.py` keeps every test off the real `~/.cache`.
+New app-managed files should go here and use the same helpers. Always read both locations at
+call time (`defaults.CACHE_DIR`, `defaults.config_file()`, …; never `from gtasks.defaults import
+CACHE_DIR`), so the overrides in `tests/conftest.py` keep every test off the real `~/.config`
+and `~/.cache`.
 
 ## Conventions
 

@@ -2,6 +2,8 @@ from configparser import ConfigParser
 from enum import Enum
 from pathlib import Path
 
+from gtasks import defaults
+
 DEFAULT_SECTION: str = "DEFAULT"
 
 
@@ -18,6 +20,19 @@ LEGACY_DEFAULT_TASKLIST_KEY = "default_tasklist"
 
 class Config:
     """Simple config file manager."""
+
+    @classmethod
+    def default(cls) -> "Config":
+        """The user's config file, renaming the legacy `config.toml` (INI despite the name)
+        to `config.ini` the first time; if that rename fails, the legacy file is used as is."""
+        path = defaults.config_file()
+        legacy = path.with_name(defaults.LEGACY_CONFIG_FILE_NAME)
+        if not path.exists() and legacy.exists():
+            try:
+                legacy.rename(path)
+            except OSError:
+                path = legacy
+        return cls(path)
 
     def __init__(
         self,

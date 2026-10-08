@@ -963,7 +963,6 @@ class TestPartialTitleCommands:
         client.get_tasks.return_value = self.TASKS
         with (
             patch("gtasks.app.build_client", return_value=client),
-            patch("gtasks.app.CONFIG_FILE_PATH", tmp_path / "config.toml"),
             patch("builtins.input", side_effect=EOFError),
         ):
             assert main(["delete", "milk"]) == 130

@@ -127,7 +127,7 @@ def _target_tasklist_id(store: CacheStore, parsed_args: argparse.Namespace) -> s
         # An ambiguous or unknown list gets no suggestions rather than a guess.
         return match.matches[0]["id"] if match is not None and len(match.matches) == 1 else None
 
-    active = Config(defaults.CONFIG_FILE_PATH).get(ConfigKey.ACTIVE_TASKLIST_ID)
+    active = Config.default().get(ConfigKey.ACTIVE_TASKLIST_ID)
     if active:
         return active
 

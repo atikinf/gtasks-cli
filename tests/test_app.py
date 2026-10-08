@@ -19,12 +19,9 @@ def _http_error(status: int) -> HttpError:
 
 
 @pytest.fixture
-def build_client(tmp_path: Path) -> Iterator[Mock]:
+def build_client() -> Iterator[Mock]:
     """Patch out sign-in entirely; yields the factory main() would call."""
-    with (
-        patch("gtasks.app.build_client") as build_client,
-        patch("gtasks.app.CONFIG_FILE_PATH", tmp_path / "config.toml"),
-    ):
+    with patch("gtasks.app.build_client") as build_client:
         # Reads are live unless a test says otherwise (no "cached Xm ago" note).
         build_client.return_value.tasks_cache_state.return_value = None
         build_client.return_value.tasklists_cache_state.return_value = None
@@ -90,11 +87,10 @@ class TestMainErrorRouting:
         assert "Cancelled." in capsys.readouterr().err
 
     def test_main_GIVEN_client_construction_fails_THEN_same_error_format(
-        self, tmp_path: Path, capsys: CaptureFixture[str]
+        self, capsys: CaptureFixture[str]
     ) -> None:
-        with (
-            patch("gtasks.app.build_client", side_effect=FileNotFoundError("credentials.json")),
-            patch("gtasks.app.CONFIG_FILE_PATH", tmp_path / "config.toml"),
+        with patch(
+            "gtasks.app.build_client", side_effect=FileNotFoundError("credentials.json")
         ):
             code = main(["tasks"])
 
@@ -174,7 +170,8 @@ class TestMainClientConstruction:
     def test_main_GIVEN_cache_off_THEN_no_cache_dir(
         self, build_client: Mock, tmp_path: Path
     ) -> None:
-        (tmp_path / "config.toml").write_text("[DEFAULT]\ncache = off\n")
+        defaults.config_file().parent.mkdir(parents=True)
+        defaults.config_file().write_text("[DEFAULT]\ncache = off\n")
         build_client.return_value.get_tasklists.return_value = []
 
         assert main(["lists"]) == 0

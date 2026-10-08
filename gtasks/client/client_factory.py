@@ -11,11 +11,11 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from gtasks import defaults
 from gtasks.client.api_client import ApiClient
 from gtasks.client.cache_store import CacheStore, account_key
 from gtasks.client.caching_client import CachingClient
 from gtasks.client.protocol import TasksClient
-from gtasks.defaults import APP_CFG_PATH, TOKEN_PATH
 
 if TYPE_CHECKING:
     from google.oauth2.credentials import Credentials
@@ -64,8 +64,8 @@ def build_client(
     *,
     fresh: bool = False,
     cache_dir: Path | None = None,
-    token_path: Path = TOKEN_PATH,
-    creds_path: Path = APP_CFG_PATH / "credentials.json",
+    token_path: Path | None = None,
+    creds_path: Path | None = None,
     allow_sign_in: bool = True,
 ) -> TasksClient:
     """Sign in and build the client: cached under `cache_dir` if given, else plain.
@@ -74,7 +74,11 @@ def build_client(
     the main client and a concurrent refetch never race to refresh the same token.
     `allow_sign_in=False` never starts the browser flow (see `auth_from_file`).
     """
-    creds: Credentials = auth_from_file(token_path, creds_path, allow_sign_in=allow_sign_in)
+    creds: Credentials = auth_from_file(
+        token_path or defaults.token_file(),
+        creds_path or defaults.credentials_file(),
+        allow_sign_in=allow_sign_in,
+    )
     if cache_dir is None:
         return ApiClient(build_tasks_resource(creds))
 

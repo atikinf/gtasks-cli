@@ -10,6 +10,7 @@ from httplib2 import Response
 from mcp.server.mcpserver.exceptions import ToolError, UnexpectedToolError
 from mcp_types import CallToolResult, ToolAnnotations
 
+from gtasks import defaults
 from gtasks.client.client_factory import SignInRequiredError
 from gtasks.mcp_server import server as server_module
 from gtasks.mcp_server.server import build_server
@@ -48,10 +49,8 @@ def client() -> MagicMock:
 
 
 @pytest.fixture
-def config_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    path = tmp_path / "config.toml"
-    monkeypatch.setattr(server_module, "CONFIG_FILE_PATH", path)
-    return path
+def config_path() -> Path:
+    return defaults.config_file()
 
 
 @pytest.fixture(autouse=True)

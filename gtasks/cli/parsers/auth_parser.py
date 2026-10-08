@@ -10,7 +10,6 @@ from gtasks.cli import ui
 from gtasks.cli.errors import Cancelled
 from gtasks.client.cache_store import clear_cache
 from gtasks.client.client_factory import auth
-from gtasks.defaults import TOKEN_PATH
 from gtasks.utils.config import Config
 
 if TYPE_CHECKING:
@@ -82,7 +81,7 @@ def cmd_auth(args: argparse.Namespace, get_client: "ClientProvider", cfg: Config
         raise Cancelled()
 
     client_id, client_secret = result
-    auth(TOKEN_PATH, client_id, client_secret)
+    auth(defaults.token_file(), client_id, client_secret)
     # Cached data is per account, so this is tidiness, not correctness: drop what a previous
     # sign-in left behind.
     clear_cache(defaults.CACHE_DIR)

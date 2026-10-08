@@ -32,7 +32,6 @@ except ModuleNotFoundError as e:  # pragma: no cover - only without the `mcp` ex
 from gtasks import defaults
 from gtasks.client.client_factory import SignInRequiredError, build_client
 from gtasks.client.protocol import DEFAULT_TASKLIST_ID
-from gtasks.defaults import CONFIG_FILE_PATH
 from gtasks.utils.config import Config, ConfigKey
 
 if TYPE_CHECKING:
@@ -202,7 +201,7 @@ def build_server(get_client: "ClientProvider") -> MCPServer:
         with _client_errors():
             client = get_client(fresh=refresh)
             default_id = client.get_tasklist(DEFAULT_TASKLIST_ID).get("id")
-            active_id = Config(CONFIG_FILE_PATH).get(ConfigKey.ACTIVE_TASKLIST_ID)
+            active_id = Config.default().get(ConfigKey.ACTIVE_TASKLIST_ID)
             out: list[TaskListOut] = []
             for tasklist in client.get_tasklists():
                 item: TaskListOut = {"id": tasklist["id"], "title": tasklist.get("title", "")}
@@ -414,7 +413,7 @@ def _make_client_provider() -> "ClientProvider":
     lock = threading.Lock()
 
     def get_client(*, fresh: bool = False) -> "TasksClient":
-        cache_off = Config(CONFIG_FILE_PATH).get(ConfigKey.CACHE) == "off"
+        cache_off = Config.default().get(ConfigKey.CACHE) == "off"
         with lock:
             return build_client(
                 fresh=fresh,
