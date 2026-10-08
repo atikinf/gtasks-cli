@@ -176,11 +176,12 @@ class ApiClient:
         results: list[Task] = []
         errors: list[Exception] = []
 
-        def _cb(request_id: str, response: "Task", exception: Exception | None) -> None:
+        # The stubs type `response` as an HttpRequest; it's the deserialized body (a Task).
+        def _cb(request_id: str, response: Any, exception: Exception | None) -> None:
             if exception is not None:
                 errors.append(exception)
             elif response:
-                results.append(response)
+                results.append(cast("Task", response))
 
         batch = self._service.new_batch_http_request(callback=_cb)
         for task_id in task_ids:

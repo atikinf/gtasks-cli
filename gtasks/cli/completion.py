@@ -22,7 +22,8 @@ from gtasks.cli.title_matching import complete_titles, match_titles, normalize
 from gtasks.client.cache_store import CacheStore
 from gtasks.utils.config import Config, ConfigKey
 
-Completer = Callable[..., list[str]]
+# Candidates, or {candidate: description} (zsh and fish show descriptions; bash ignores them).
+Completer = Callable[..., list[str] | dict[str, str]]
 
 
 def attach(action: argparse.Action, completer: Completer) -> argparse.Action:
@@ -56,7 +57,7 @@ def complete(parser: argparse.ArgumentParser) -> None:
 
 def _never_raises(completer: Completer) -> Completer:
     @wraps(completer)
-    def safe(*args: Any, **kwargs: Any) -> list[str]:
+    def safe(*args: Any, **kwargs: Any) -> list[str] | dict[str, str]:
         try:
             return completer(*args, **kwargs)
         except Exception:

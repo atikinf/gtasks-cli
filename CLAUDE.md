@@ -12,10 +12,10 @@ uv run pytest                      # run all tests
 uv run pytest tests/client/test_api_client.py::TestGetTasklists  # single class/test
 uv run pytest --cov=gtasks         # coverage (pytest-cov installed)
 uv run ruff check .                # lint (CI gate)
-uv run ty check                    # type check (available, not in CI)
+uv run ty check gtasks             # type check the package (CI gate; tests not checked)
 ```
 
-CI (`.github/workflows`) runs `ruff check .` then `pytest` on pushes/PRs to `master`.
+CI (`.github/workflows`) runs `ruff check .`, `ty check gtasks`, then `pytest` on pushes/PRs to `master`.
 
 ## Architecture
 
