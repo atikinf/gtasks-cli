@@ -12,7 +12,7 @@ instead. When a merge isn't safe, the list's file is dropped so the next read re
 """
 
 import threading
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, cast
 
@@ -26,6 +26,20 @@ if TYPE_CHECKING:
 
 # A merge either returns the new task list, or None for "can't tell, drop the cached copy".
 Merge = Callable[[Tasks], Tasks | None]
+
+
+def _without_subtrees(tasks: Tasks, task_ids: Iterable[str]) -> Tasks:
+    """`tasks` minus `task_ids` and every task under them: Google Tasks completes and deletes
+    a task's subtasks along with it (checked against the live API)."""
+    gone = set(task_ids)
+    changed = True
+    while changed:
+        changed = False
+        for t in tasks:
+            if t.get("parent") in gone and t.get("id") not in gone:
+                gone.add(t["id"])
+                changed = True
+    return [t for t in tasks if t.get("id") not in gone]
 
 
 def _saved(fetched_at: float | None) -> CacheState | None:
@@ -241,7 +255,7 @@ class CachingClient:
         def merge(task: "Task") -> Merge:
             def apply(tasks: Tasks) -> Tasks | None:
                 if task.get("status") == Status.COMPLETED.value:
-                    return [t for t in tasks if t.get("id") != task_id]
+                    return _without_subtrees(tasks, [task_id])
                 if not any(t.get("id") == task_id for t in tasks):
                     return None  # newly open again, position unknown
                 return [cast(dict[str, Any], task) if t.get("id") == task_id else t
@@ -252,30 +266,17 @@ class CachingClient:
         return self._write(tasklist_id, update, merge)
 
     def complete_tasks(self, tasklist_id: str, task_ids: list[str]) -> "list[Task]":
-        done = set(task_ids)
         return self._write(
             tasklist_id,
             lambda: self._inner().complete_tasks(tasklist_id, task_ids),
-            lambda _: lambda tasks: [t for t in tasks if t.get("id") not in done],
+            lambda _: lambda tasks: _without_subtrees(tasks, task_ids),
         )
 
     def delete_tasks(self, tasklist_id: str, task_ids: list[str]) -> None:
-        def without_deleted(tasks: Tasks) -> Tasks:
-            # Deleting a task takes its subtasks with it, so drop descendants too.
-            gone = set(task_ids)
-            changed = True
-            while changed:
-                changed = False
-                for t in tasks:
-                    if t.get("parent") in gone and t.get("id") not in gone:
-                        gone.add(t["id"])
-                        changed = True
-            return [t for t in tasks if t.get("id") not in gone]
-
         self._write(
             tasklist_id,
             lambda: self._inner().delete_tasks(tasklist_id, task_ids),
-            lambda _: without_deleted,
+            lambda _: lambda tasks: _without_subtrees(tasks, task_ids),
         )
 
     def reopen_tasks(self, tasklist_id: str, task_ids: list[str]) -> "list[Task]":

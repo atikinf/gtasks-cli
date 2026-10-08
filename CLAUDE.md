@@ -104,7 +104,8 @@ data but still stores what it fetches; `--refresh` makes any command fresh (regi
 `cli_utils.add_refresh_option` on every subcommand that uses the API). Task writes refetch
 the list concurrently on a second client (`make_refresher`: its own httplib2 connection, which
 isn't thread-safe to share, with a timeout) and merge the write's result into that copy;
-anything not safely mergeable drops the list's file instead. `tasks_cache_state` and
+anything not safely mergeable drops the list's file instead. Completing or deleting a task also removes
+its subtasks from the cached copy (`_without_subtrees`), as Google Tasks does (checked live). `tasks_cache_state` and
 `tasklists_cache_state` (the protocol's only non-API methods; `ApiClient` returns `None`) return a
 `CacheState(from_cache, fetched_at)` so `tasks`, `lists` and the `use` picker can say
 "cache refreshed" (fetched live and saved), "cached 12m ago" (served from it), or nothing (no

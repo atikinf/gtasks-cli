@@ -308,6 +308,47 @@ class TestTaskWrites:
 
         assert _cached(store) == ["x"]
 
+    TREE = [{"id": "p"}, {"id": "c", "parent": "p"}, {"id": "gc", "parent": "c"}, {"id": "x"}]
+
+    def test_complete_GIVEN_parent_THEN_cached_subtasks_removed_too(
+        self, client: CachingClient, refresher: MagicMock, store: CacheStore
+    ) -> None:
+        refresher.get_tasks.return_value = self.TREE
+
+        client.complete_tasks("l1", ["p"])
+
+        assert _cached(store) == ["x"]
+
+    def test_complete_GIVEN_parent_and_list_fetched_this_run_THEN_subtasks_removed(
+        self, client: CachingClient, inner: MagicMock, refresher: MagicMock, store: CacheStore
+    ) -> None:
+        inner.get_tasks.return_value = self.TREE
+        client.get_tasks("l1", show_completed=False)
+
+        client.complete_tasks("l1", ["p"])
+
+        refresher.get_tasks.assert_not_called()
+        assert _cached(store) == ["x"]
+
+    def test_complete_GIVEN_subtask_THEN_parent_and_others_stay(
+        self, client: CachingClient, refresher: MagicMock, store: CacheStore
+    ) -> None:
+        refresher.get_tasks.return_value = self.TREE
+
+        client.complete_tasks("l1", ["c"])
+
+        assert _cached(store) == ["p", "x"]
+
+    def test_update_GIVEN_parent_completed_THEN_cached_subtasks_removed_too(
+        self, client: CachingClient, inner: MagicMock, refresher: MagicMock, store: CacheStore
+    ) -> None:
+        refresher.get_tasks.return_value = self.TREE
+        inner.update_task.return_value = {"id": "p", "status": Status.COMPLETED.value}
+
+        client.update_task("l1", "p", status=Status.COMPLETED)
+
+        assert _cached(store) == ["x"]
+
     @pytest.mark.parametrize(
         "returned, expected",
         [
