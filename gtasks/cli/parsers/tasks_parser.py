@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from gtasks.cli import ui
 from gtasks.cli.cli_utils import add_refresh_option
+from gtasks.cli.listing_state import ListingState
 from gtasks.cli.task_order import display_order
 from gtasks.cli.title_id_resolution import (
     TargetList,
@@ -12,7 +13,6 @@ from gtasks.cli.title_id_resolution import (
     resolve_target_tasklist,
 )
 from gtasks.utils.config import Config
-from gtasks.utils.listing_state import ListingState
 
 if TYPE_CHECKING:
     from gtasks.client.protocol import ClientProvider, TasksClient

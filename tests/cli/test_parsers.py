@@ -11,6 +11,7 @@ from pytest import CaptureFixture
 from gtasks.cli import ui
 from gtasks.cli.cli import build_parser
 from gtasks.cli.errors import Cancelled, CliError
+from gtasks.cli.listing_state import ListingState
 from gtasks.cli.parsers.add_parser import cmd_add
 from gtasks.cli.parsers.config_parser import cmd_config
 from gtasks.cli.parsers.delete_parser import cmd_delete
@@ -20,7 +21,6 @@ from gtasks.cli.parsers.tasks_parser import cmd_tasks
 from gtasks.cli.parsers.use_parser import cmd_use
 from gtasks.client.protocol import CacheState
 from gtasks.utils.config import Config, ConfigKey
-from gtasks.utils.listing_state import ListingState
 
 # =============================================================================
 # Shared Fixtures

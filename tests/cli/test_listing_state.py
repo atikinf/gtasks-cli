@@ -4,8 +4,8 @@ from pathlib import Path
 import pytest
 
 from gtasks import defaults
+from gtasks.cli.listing_state import LISTING_FILE_NAME, SCHEMA_VERSION, ListingState
 from gtasks.client.cache_store import clear_cache
-from gtasks.utils.listing_state import LISTING_FILE_NAME, SCHEMA_VERSION, ListingState
 
 TASKS = [
     {"id": "t1", "title": "Buy milk"},

@@ -66,7 +66,7 @@ in `cli/title_id_resolution.py`:
   collide, and no match raises `CliError`. Both are shared by lists and tasks.
 - Lists: `find_tasklist(client, title)` = `match_title` over `get_tasklists()` → `choose_tasklist`.
 - `resolve_tasks_from_inputs` accepts titles or 1-based display numbers. Numbers
-  resolve against the last listing shown for that list (`utils/listing_state.py`, written by
+  resolve against the last listing shown for that list (`cli/listing_state.py`, written by
   `cmd_tasks`), so `done 3` hits the task the user saw even if the list changed since; rows
   are marked consumed after `done`/`delete`. With no recorded listing numbers index the
   needsAction list; titles always match against it (open tasks only), fetched once per call.

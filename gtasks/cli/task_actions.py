@@ -5,6 +5,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from gtasks.cli import ui
+from gtasks.cli.listing_state import ListingState
 from gtasks.cli.title_id_resolution import (
     ResolvedTasks,
     TargetList,
@@ -12,7 +13,6 @@ from gtasks.cli.title_id_resolution import (
     resolve_tasks_from_inputs,
 )
 from gtasks.utils.config import Config
-from gtasks.utils.listing_state import ListingState
 
 if TYPE_CHECKING:
     from gtasks.client.protocol import ClientProvider, TasksClient

@@ -17,9 +17,9 @@ from typing import Any
 
 from gtasks import defaults
 from gtasks.cli import ui
-from gtasks.cli.title_id_resolution import ENV_VAR
 from gtasks.cli.title_matching import complete_titles, match_titles, normalize
 from gtasks.client.cache_store import CacheStore
+from gtasks.defaults import ENV_VAR
 from gtasks.utils.config import Config, ConfigKey
 
 # Candidates, or {candidate: description} (zsh and fish show descriptions; bash ignores them).

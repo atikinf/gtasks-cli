@@ -21,19 +21,20 @@ from typing import TYPE_CHECKING
 
 from gtasks.cli import ui
 from gtasks.cli.cli_utils import add_shared_option, prompt_index_choice
+from gtasks.cli.completion import attach, complete_tasklists
 from gtasks.cli.errors import Cancelled, CliError
+from gtasks.cli.listing_state import ListingState
 from gtasks.cli.task_order import display_order
 from gtasks.cli.title_matching import TitleMatch, match_titles
 from gtasks.client.protocol import DEFAULT_TASKLIST_ID
+from gtasks.defaults import ENV_VAR
 from gtasks.utils.config import LEGACY_DEFAULT_TASKLIST_KEY, Config, ConfigKey
-from gtasks.utils.listing_state import ListingState
 
 if TYPE_CHECKING:
     from googleapiclient._apis.tasks.v1.schemas import Task, TaskList
 
     from gtasks.client.protocol import TasksClient
 
-ENV_VAR = "GTASKS_LIST"
 
 _REFRESH_HINT = "Run `gtasks tasks` to see the current numbers."
 
@@ -111,8 +112,6 @@ def set_active_tasklist(cfg: Config, tasklist: "TaskList") -> None:
 def add_tasklist_option(parser: argparse.ArgumentParser, *, top_level: bool = False) -> None:
     """Register -l/--list, so it reads the same on every list-scoped command (and before
     the subcommand: `gtasks -l Work`)."""
-    from gtasks.cli.completion import attach, complete_tasklists  # imports this module
-
     action = add_shared_option(
         parser,
         "-l",

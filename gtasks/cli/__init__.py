@@ -1,5 +1,1 @@
-"""Command-line interface for Google Tasks."""
-
-from gtasks.cli.cli import build_parser
-
-__all__ = ["build_parser"]
+"""Command-line interface for Google Tasks: argparse wiring and presentation."""

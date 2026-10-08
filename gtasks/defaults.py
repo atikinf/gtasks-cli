@@ -1,6 +1,9 @@
 import os
 from pathlib import Path
 
+# Names the list to act on for one shell (overridden by -l, overrides the active list).
+ENV_VAR = "GTASKS_LIST"
+
 APP_CFG_PATH: Path = Path(
     "~/.config/gtasks-cli"
 ).expanduser()  # settings and sign-in only

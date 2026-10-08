@@ -8,7 +8,7 @@ from rich.console import Console
 
 from gtasks import defaults
 from gtasks.cli import ui
-from gtasks.cli.title_id_resolution import ENV_VAR
+from gtasks.defaults import ENV_VAR
 
 
 def _plain_console(*, stderr: bool = False) -> Console:

@@ -8,8 +8,8 @@ from pytest import CaptureFixture
 
 from gtasks.cli.cli import build_parser
 from gtasks.cli.errors import Cancelled, CliError
+from gtasks.cli.listing_state import ListingState
 from gtasks.cli.title_id_resolution import (
-    ENV_VAR,
     ResolvedTasks,
     TargetList,
     choose_tasklist,
@@ -17,8 +17,8 @@ from gtasks.cli.title_id_resolution import (
     resolve_tasks_from_inputs,
 )
 from gtasks.cli.title_matching import match_titles
+from gtasks.defaults import ENV_VAR
 from gtasks.utils.config import LEGACY_DEFAULT_TASKLIST_KEY, Config, ConfigKey
-from gtasks.utils.listing_state import ListingState
 
 WORK = {"id": "list1", "title": "Work"}
 WORK_DUPE = {"id": "list2", "title": "Work"}
