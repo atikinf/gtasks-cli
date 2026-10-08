@@ -1,2 +1,1 @@
-# __init__.py
-__version__ = "0.1.0"
+"""Google Tasks command-line interface."""

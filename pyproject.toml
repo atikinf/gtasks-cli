@@ -16,10 +16,6 @@ dependencies = [
     "google-auth>=2.41",
     "google-auth-oauthlib>=1.2",
     "google-api-python-client>=2.187",
-    "pytest-mock>=3.15.1",
-    "google-api-python-client-stubs>=1.31.0",
-    "ty>=0.0.9",
-    "pytest-cov>=7.0.0",
     "dateparser>=1.4.0",
     "rich>=15.0.0",
     "argcomplete>=3.7.2",
@@ -58,7 +54,10 @@ known-first-party = ["gtasks"]
 dev = [
     "gtasks-cli[mcp]",
     "anyio>=4",
+    "google-api-python-client-stubs>=1.31.0",
+    "pytest-cov>=7.0.0",
     "pytest>=9.0.2",
     "ruff>=0.15.11",
+    "ty>=0.0.9",
     "types-dateparser>=1.4.0.20260408",
 ]
