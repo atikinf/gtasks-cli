@@ -36,10 +36,19 @@ never do. So the client — and with it credential loading and the OAuth flow �
 commands that need it: never for `--help` or invalid invocations, and never for `auth` (which
 creates those credentials) or `config`. Tests pass `lambda **_: mock_client`.
 To add a command: write the module pair, then register it in `build_parser`. Bare `gtasks` is
-handled by a top-level `set_defaults` pointing at `cmd_list_tasks` with
+handled by a top-level `set_defaults` pointing at `cmd_tasks` with
 `limit=tasks_parser.DEFAULT_LIMIT` (10). The listing itself is `tasks_parser.show_tasks` (fetch,
 render, record the listing for numbers), shared by `tasks`, bare `gtasks` and `use`, which shows
 the newly active list right after switching (cached like bare `gtasks`; `--refresh` for fresh).
+Likewise `lists_parser.show_tasklists` (fetch all, keep the active list's stored title current
+on renames, apply `limit` with a "more not shown" note, render) serves `lists` and the `use`
+picker, and `cli/task_actions.act_on_tasks` is the shared `done`/`delete` flow: fresh client,
+resolve inputs, optional confirm, act, retire listing numbers, report.
+Display order is `cli/task_order.py:display_order` (pure): the app's manual order (`position`,
+relative to siblings) with subtasks right under their parent; the API itself returns most
+recently updated first. So `show_tasks` fetches the whole list and applies `limit` after
+ordering, number fallback in `resolve_tasks_from_inputs` uses the same order, and `ui.render_tasks`
+marks a subtask `└` when its parent is shown. The cache keeps API order; ordering is display-only.
 
 **Which list a command acts on.** Every list-scoped handler calls
 `title_id_resolution.resolve_target_tasklist`, whose precedence is: `-l/--list` flag >
@@ -58,7 +67,7 @@ in `cli/title_id_resolution.py`:
 - Lists: `find_tasklist(client, title)` = `match_title` over `get_tasklists()` → `choose_tasklist`.
 - `resolve_tasks_from_inputs` accepts titles or 1-based display numbers. Numbers
   resolve against the last listing shown for that list (`utils/listing_state.py`, written by
-  `cmd_list_tasks`), so `done 3` hits the task the user saw even if the list changed since; rows
+  `cmd_tasks`), so `done 3` hits the task the user saw even if the list changed since; rows
   are marked consumed after `done`/`delete`. With no recorded listing numbers index the
   needsAction list; titles always match against it (open tasks only), fetched once per call.
   Any unresolvable input raises before a batch is sent.
@@ -82,7 +91,8 @@ case differs from what was typed (zsh filters case-sensitively by default).
 
 **Output and errors.** All terminal output goes through `cli/ui.py` (rich, one `THEME` of semantic
 styles); handlers never `print`. User strings are wrapped in `Text`, never interpolated into rich
-markup. Handlers raise `cli/errors.py:CliError(message, hint=, exit_code=)` instead of printing
+markup. Show a task's or list's title with `ui.display_title` (Google sends
+untitled items with an empty title, so a `.get` default never applies). Handlers raise `cli/errors.py:CliError(message, hint=, exit_code=)` instead of printing
 and calling `sys.exit`; `app.main` renders it (plus `ExceptionGroup`, `HttpError`, Ctrl-C) to
 stderr. Errors bubble up untouched and are mapped to messages only there. Signed-out states all
 end in a `gtasks auth` hint via `_report_signed_out`: `SignInRequiredError` (raised by

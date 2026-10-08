@@ -35,7 +35,7 @@ def parse_due_date(date_str: str) -> str:
     return dt.strftime("%Y-%m-%dT00:00:00.000Z")
 
 
-def cmd_add_task(args: argparse.Namespace, get_client: "ClientProvider", cfg: Config) -> None:
+def cmd_add(args: argparse.Namespace, get_client: "ClientProvider", cfg: Config) -> None:
     """Handle the 'add' command to create a new task."""
     # Parse the date before touching the API so a typo fails fast.
     try:
@@ -51,10 +51,10 @@ def cmd_add_task(args: argparse.Namespace, get_client: "ClientProvider", cfg: Co
         notes=args.notes,
         due=due,
     )
-    ui.report_mutation("Added", [task.get("title", args.title)], target.title)
+    ui.report_mutation("Added", [ui.display_title(task)], target.title)
 
 
-def add_subparser_add_task(subparsers) -> None:
+def add_subparser_add(subparsers) -> None:
     """Add the 'add' subcommand to create a new task."""
     add_parser = subparsers.add_parser(
         "add",
@@ -68,8 +68,7 @@ def add_subparser_add_task(subparsers) -> None:
     )
     add_tasklist_option(add_parser)
     add_parser.add_argument(
-        "-n",
-        "--notes",
+        "--notes",  # no -n: that's --limit on `tasks` and `lists`
         type=str,
         default=None,
         help="Notes for the task",
@@ -82,4 +81,4 @@ def add_subparser_add_task(subparsers) -> None:
         help="Due date (natural language e.g. 'tomorrow', 'next friday', '2026-05-01')",
     )
     add_refresh_option(add_parser)
-    add_parser.set_defaults(func=cmd_add_task)
+    add_parser.set_defaults(func=cmd_add)

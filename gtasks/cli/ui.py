@@ -8,8 +8,9 @@ interpolated into rich markup, so a title like "[urgent] pay rent" renders verba
 """
 
 import time
+from collections.abc import Mapping
 from datetime import date, datetime, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 from rich.table import Table
@@ -39,6 +40,16 @@ THEME = Theme(
 
 OPEN_MARK = "○"
 DONE_MARK = "✓"
+SUBTASK_MARK = "└ "
+
+# Shown by `lists` and raised by the `use` picker when the account has no task lists.
+NO_TASKLISTS = "No task lists."
+
+
+def display_title(item: Mapping[str, Any]) -> str:
+    """A task's or list's title for display. Google sends an untitled item with an empty
+    title, so `.get("title", default)` alone isn't enough."""
+    return item.get("title") or "(untitled)"
 ACTIVE_MARK = "●"
 _NOTES_MAX = 60
 # Long titles wrap at this width so the due column stays next to the titles.
@@ -209,20 +220,24 @@ def render_tasks(
 
     table = Table.grid(padding=(0, 1), pad_edge=True)
     table.add_column(justify="right", style="index", no_wrap=True)
-    table.add_column(no_wrap=True)
+    # Mark and title share a cell, so a subtask's "└ ○ title" is indented as a whole.
     table.add_column(overflow="fold", max_width=_TITLE_MAX)
     if show_ids:
         table.add_column(style="muted", no_wrap=True)
     table.add_column(no_wrap=True)
 
+    shown_ids = {t.get("id") for t in tasks}
     for ix, task in enumerate(tasks, 1):
         completed = task.get("status") == "completed"
         mark = Text(DONE_MARK, style="success") if completed else Text(OPEN_MARK, style="muted")
-        title = Text(task.get("title") or "(untitled)", style="done" if completed else "")
+        title = Text(display_title(task), style="done" if completed else "")
+        # A subtask shown with its parent (they're ordered parent-first) is indented under it.
+        nest = Text(SUBTASK_MARK, style="muted") if task.get("parent") in shown_ids else Text("")
+        item = Text.assemble(nest, mark, " ", title)
         due = task.get("due")
         due_cell = Text(*format_due(due, today)) if due and not completed else Text("")
 
-        row: list[Text] = [Text(str(ix)), mark, title]
+        row: list[Text] = [Text(str(ix)), item]
         if show_ids:
             row.append(Text(task.get("id", "")))
         row.append(due_cell)
@@ -230,7 +245,9 @@ def render_tasks(
 
         notes = task.get("notes")
         if notes and _one_line(notes):
-            notes_row = [Text(""), Text(""), Text(_one_line(notes), style="muted")]
+            # Under the title text, past the (possibly nested) mark.
+            pad = " " * (len(nest) + len(mark) + 1)
+            notes_row = [Text(""), Text(pad + _one_line(notes), style="muted")]
             notes_row += [Text("")] * (len(row) - len(notes_row))
             table.add_row(*notes_row)
 
@@ -251,18 +268,21 @@ def render_tasklists(
     heading: str | None = None,
     active_id: str | None = None,
     show_ids: bool = False,
+    truncated: bool = False,
     cache: "CacheState | None" = None,
 ) -> None:
     """Print a numbered list of task lists, marking the active one.
 
+    `truncated` means more lists exist than were passed (a --limit cut it short).
     `cache` says whether the lists came from (or were just saved to) the cache.
     """
     if heading is not None:
-        details = f" · {len(tasklists)}{_cache_note(cache)}"
+        count = f"{len(tasklists)}+" if truncated else str(len(tasklists))
+        details = f" · {count}{_cache_note(cache)}"
         out().print(Text.assemble(_INDENT, (heading, "heading"), (details, "muted")))
 
     if not tasklists:
-        out().print(Text(f"{_INDENT} No task lists.", style="muted"))
+        out().print(Text(f"{_INDENT} {NO_TASKLISTS}", style="muted"))
         return
 
     table = Table.grid(padding=(0, 1), pad_edge=True)
@@ -275,10 +295,13 @@ def render_tasklists(
     for ix, tasklist in enumerate(tasklists, 1):
         is_active = active_id is not None and tasklist.get("id") == active_id
         mark = Text(ACTIVE_MARK, style="active") if is_active else Text(" ")
-        title = Text(tasklist.get("title") or "(untitled)", style="active" if is_active else "")
+        title = Text(display_title(tasklist), style="active" if is_active else "")
         row = [Text(str(ix)), mark, title]
         if show_ids:
             row.append(Text(tasklist.get("id", "")))
         table.add_row(*row)
 
     out().print(table)
+    if truncated:
+        hint = f"{_INDENT} More not shown. Run `gtasks lists` to see all."
+        out().print(Text(hint, style="muted"))

@@ -13,11 +13,13 @@ gtasks                    # first 10 open tasks in the active list
 gtasks tasks              # all open tasks
 gtasks lists              # all task lists (● marks the active one)
 gtasks use Work           # set the active list and show it (omit the name to pick)
-gtasks add "Buy milk" -d "next fri" -n "2%"
+gtasks add "Buy milk" -d "next fri" --notes "2%"
 gtasks done 1 3           # by the numbers shown in the last listing, or by title
 gtasks done milk          # part of a title works too, if only one task matches
 gtasks delete "Buy milk"  # a partial title asks before deleting (-y to skip)
 ```
+
+Tasks are listed in the same order as the Google Tasks app, with subtasks shown under their parent (`└`).
 
 Titles ignore case. If part of a title matches several tasks or lists, you pick one from a numbered list; if nothing matches, close spellings are suggested.
 

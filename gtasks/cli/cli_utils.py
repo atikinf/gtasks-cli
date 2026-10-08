@@ -114,5 +114,5 @@ def add_refresh_option(parser: argparse.ArgumentParser, *, top_level: bool = Fal
         top_level=top_level,
         default=False,
         action="store_true",
-        help="ignore cached data and fetch fresh from Google Tasks",
+        help="Ignore cached data and fetch fresh from Google Tasks",
     )

@@ -42,5 +42,5 @@ def add_subparser_completion(subparsers) -> None:
             "`gtasks completion fish | source` in ~/.config/fish/config.fish."
         ),
     )
-    completion_parser.add_argument("shell", choices=SHELLS, help="your shell")
+    completion_parser.add_argument("shell", choices=SHELLS, help="Your shell")
     completion_parser.set_defaults(func=cmd_completion)

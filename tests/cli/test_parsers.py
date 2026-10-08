@@ -8,14 +8,15 @@ from unittest.mock import Mock, patch
 import pytest
 from pytest import CaptureFixture
 
+from gtasks.cli import ui
 from gtasks.cli.cli import build_parser
 from gtasks.cli.errors import Cancelled, CliError
-from gtasks.cli.parsers.add_parser import cmd_add_task
+from gtasks.cli.parsers.add_parser import cmd_add
 from gtasks.cli.parsers.config_parser import cmd_config
 from gtasks.cli.parsers.delete_parser import cmd_delete
 from gtasks.cli.parsers.done_parser import cmd_done
-from gtasks.cli.parsers.lists_parser import cmd_list_tasklists
-from gtasks.cli.parsers.tasks_parser import DEFAULT_LIMIT, cmd_list_tasks
+from gtasks.cli.parsers.lists_parser import cmd_lists
+from gtasks.cli.parsers.tasks_parser import cmd_tasks
 from gtasks.cli.parsers.use_parser import cmd_use
 from gtasks.client.protocol import CacheState
 from gtasks.utils.config import Config, ConfigKey
@@ -92,10 +93,10 @@ class TestAddParserArgs:
     @pytest.mark.parametrize(
         "cli_args, expected_notes, expected_due",
         [
-            (["add", "Task", "-l", "title1", "-n", "Notes here"], "Notes here", None),
+            (["add", "Task", "-l", "title1", "--notes", "Notes here"], "Notes here", None),
             (["add", "Task", "-l", "title1", "-d", "2026-01-15"], None, "2026-01-15"),
             (
-                ["add", "Task", "-l", "title1", "-n", "Notes", "-d", "2026-01-15"],
+                ["add", "Task", "-l", "title1", "--notes", "Notes", "-d", "2026-01-15"],
                 "Notes",
                 "2026-01-15",
             ),
@@ -119,6 +120,14 @@ class TestAddParserArgs:
     ) -> None:
         with pytest.raises(SystemExit):
             parser.parse_args(["add"])
+
+    def test_add_GIVEN_short_n_THEN_rejected(
+        self, parser: argparse.ArgumentParser, capsys: CaptureFixture
+    ) -> None:
+        """-n is --limit elsewhere; on `add` it must not silently become notes."""
+        with pytest.raises(SystemExit):
+            parser.parse_args(["add", "Task", "-n", "5"])
+        capsys.readouterr()
 
 
 class TestTasksParserArgs:
@@ -278,19 +287,19 @@ def active_config(config: Config) -> Config:
     return config
 
 
-class TestCmdAddTask:
-    """Test the cmd_add_task command handler."""
+class TestCmdAdd:
+    """Test the cmd_add command handler."""
 
     @pytest.fixture
     def base_args(self) -> dict:
         return {"tasklist_title": None, "title": "Test Task", "notes": None, "due": None}
 
-    def test_cmd_add_task_GIVEN_active_list_THEN_adds_there_and_confirms_with_list(
+    def test_cmd_add_GIVEN_active_list_THEN_adds_there_and_confirms_with_list(
         self, mock_client: Mock, active_config: Config, base_args: dict, capsys: CaptureFixture
     ) -> None:
         mock_client.add_task.return_value = {"title": "Test Task"}
 
-        cmd_add_task(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
+        cmd_add(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
 
         mock_client.add_task.assert_called_once_with(
             tasklist_id="list1", task_title="Test Task", notes=None, due=None
@@ -298,24 +307,24 @@ class TestCmdAddTask:
         mock_client.get_tasklists.assert_not_called()
         assert "✓ Added Test Task · Work" in capsys.readouterr().out
 
-    def test_cmd_add_task_GIVEN_list_flag_THEN_overrides_active(
+    def test_cmd_add_GIVEN_list_flag_THEN_overrides_active(
         self, mock_client: Mock, active_config: Config, base_args: dict
     ) -> None:
         mock_client.get_tasklists.return_value = [{"id": "list2", "title": "Home"}]
         mock_client.add_task.return_value = {"title": "Test Task"}
         base_args["tasklist_title"] = "home"
 
-        cmd_add_task(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
+        cmd_add(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
 
         assert mock_client.add_task.call_args.kwargs["tasklist_id"] == "list2"
 
-    def test_cmd_add_task_GIVEN_notes_and_due_THEN_passes_to_client(
+    def test_cmd_add_GIVEN_notes_and_due_THEN_passes_to_client(
         self, mock_client: Mock, active_config: Config, base_args: dict
     ) -> None:
         mock_client.add_task.return_value = {"title": "Test Task"}
         base_args.update(notes="Important notes", due="2026-01-20T00:00:00Z")
 
-        cmd_add_task(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
+        cmd_add(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
 
         mock_client.add_task.assert_called_once_with(
             tasklist_id="list1",
@@ -324,30 +333,30 @@ class TestCmdAddTask:
             due="2026-01-20T00:00:00.000Z",
         )
 
-    def test_cmd_add_task_GIVEN_unparseable_due_THEN_raises_before_api_call(
+    def test_cmd_add_GIVEN_unparseable_due_THEN_raises_before_api_call(
         self, mock_client: Mock, active_config: Config, base_args: dict
     ) -> None:
         base_args["due"] = "blursday"
 
         with pytest.raises(CliError, match="Could not parse due date"):
-            cmd_add_task(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
+            cmd_add(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
 
         assert mock_client.mock_calls == []
 
-    def test_cmd_add_task_GIVEN_no_matching_tasklist_THEN_raises(
+    def test_cmd_add_GIVEN_no_matching_tasklist_THEN_raises(
         self, mock_client: Mock, config: Config, base_args: dict
     ) -> None:
         mock_client.get_tasklists.return_value = []
         base_args["tasklist_title"] = "NonExistent"
 
         with pytest.raises(CliError, match="No task list named 'NonExistent'"):
-            cmd_add_task(argparse.Namespace(**base_args), lambda **_: mock_client, config)
+            cmd_add(argparse.Namespace(**base_args), lambda **_: mock_client, config)
 
         mock_client.add_task.assert_not_called()
 
 
-class TestCmdListTasks:
-    """Test the cmd_list_tasks command handler."""
+class TestCmdTasks:
+    """Test the cmd_tasks command handler."""
 
     SAMPLE_TASKS = [
         {"id": "t1", "title": "Task 1", "notes": "Notes 1"},
@@ -359,103 +368,123 @@ class TestCmdListTasks:
     def base_args(self) -> dict:
         return {"tasklist_title": None, "limit": None, "show_ids": False}
 
-    def test_cmd_list_tasks_GIVEN_active_list_THEN_fetches_and_shows_heading(
+    def test_cmd_tasks_GIVEN_active_list_THEN_fetches_and_shows_heading(
         self, mock_client: Mock, active_config: Config, base_args: dict, capsys: CaptureFixture
     ) -> None:
         mock_client.get_tasks.return_value = self.SAMPLE_TASKS
 
-        cmd_list_tasks(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
+        cmd_tasks(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
 
-        mock_client.get_tasks.assert_called_once_with("list1", None, show_completed=False)
+        mock_client.get_tasks.assert_called_once_with("list1", show_completed=False)
         output = capsys.readouterr().out
         assert "Work · 3 open" in output
         assert "Task 1" in output
         assert "Notes 1" in output
 
-    def test_cmd_list_tasks_GIVEN_cached_data_THEN_heading_says_how_old(
+    def test_cmd_tasks_GIVEN_cached_data_THEN_heading_says_how_old(
         self, mock_client: Mock, active_config: Config, base_args: dict, capsys: CaptureFixture
     ) -> None:
         mock_client.get_tasks.return_value = self.SAMPLE_TASKS
         mock_client.tasks_cache_state.return_value = CacheState(True, 1_000_000.0)
 
         with patch("gtasks.cli.ui.time.time", return_value=1_000_000.0 + 300):
-            cmd_list_tasks(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
+            cmd_tasks(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
 
         mock_client.tasks_cache_state.assert_called_once_with("list1")
         assert "Work · 3 open · cached 5m ago" in capsys.readouterr().out
 
-    def test_cmd_list_tasks_GIVEN_data_just_saved_to_cache_THEN_heading_says_refreshed(
+    def test_cmd_tasks_GIVEN_data_just_saved_to_cache_THEN_heading_says_refreshed(
         self, mock_client: Mock, active_config: Config, base_args: dict, capsys: CaptureFixture
     ) -> None:
         mock_client.get_tasks.return_value = self.SAMPLE_TASKS
         mock_client.tasks_cache_state.return_value = CacheState(False, 1_000_000.0)
 
-        cmd_list_tasks(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
+        cmd_tasks(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
 
         assert "Work · 3 open · cache refreshed" in capsys.readouterr().out
 
-    def test_cmd_list_tasks_GIVEN_nothing_set_THEN_uses_account_default(
+    def test_cmd_tasks_GIVEN_nothing_set_THEN_uses_account_default(
         self, mock_client: Mock, config: Config, base_args: dict, capsys: CaptureFixture
     ) -> None:
         mock_client.get_tasklist.return_value = {"id": "def", "title": "My Tasks"}
         mock_client.get_tasks.return_value = []
 
-        cmd_list_tasks(argparse.Namespace(**base_args), lambda **_: mock_client, config)
+        cmd_tasks(argparse.Namespace(**base_args), lambda **_: mock_client, config)
 
-        mock_client.get_tasks.assert_called_once_with("def", None, show_completed=False)
+        mock_client.get_tasks.assert_called_once_with("def", show_completed=False)
         assert "My Tasks · 0 open" in capsys.readouterr().out
 
-    def test_cmd_list_tasks_GIVEN_limit_and_more_tasks_THEN_truncates_and_says_so(
+    def test_cmd_tasks_GIVEN_limit_and_more_tasks_THEN_truncates_and_says_so(
         self, mock_client: Mock, active_config: Config, base_args: dict, capsys: CaptureFixture
     ) -> None:
         mock_client.get_tasks.return_value = self.SAMPLE_TASKS
         base_args["limit"] = 2
 
-        cmd_list_tasks(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
+        cmd_tasks(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
 
-        mock_client.get_tasks.assert_called_once_with("list1", 3, show_completed=False)
+        # The whole list: the limit applies after putting it in display order.
+        mock_client.get_tasks.assert_called_once_with("list1", show_completed=False)
         output = capsys.readouterr().out
         assert "2+ open" in output
         assert "Task 3" not in output
 
-    def test_cmd_list_tasks_GIVEN_show_ids_THEN_includes_ids_in_output(
+    def test_cmd_tasks_GIVEN_api_order_THEN_app_order_with_subtasks_under_parent(
+        self, mock_client: Mock, active_config: Config, base_args: dict, capsys: CaptureFixture
+    ) -> None:
+        # As the API returns them: most recently updated first.
+        mock_client.get_tasks.return_value = [
+            {"id": "c", "title": "Pack", "parent": "a", "position": "00000000000000000001"},
+            {"id": "b", "title": "Taxes", "position": "00000000000000000001"},
+            {"id": "a", "title": "Trip", "position": "00000000000000000000"},
+            {"id": "d", "title": "Book", "parent": "a", "position": "00000000000000000000"},
+        ]
+        base_args["limit"] = 3
+
+        cmd_tasks(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
+
+        rows = [line.strip() for line in capsys.readouterr().out.splitlines()[1:4]]
+        assert rows == ["1 ○ Trip", "2 └ ○ Book", "3 └ ○ Pack"]
+        # Numbers follow the displayed order.
+        assert [r["id"] for r in ListingState.default().rows("list1") or []] == ["a", "d", "c"]
+
+    def test_cmd_tasks_GIVEN_show_ids_THEN_includes_ids_in_output(
         self, mock_client: Mock, active_config: Config, base_args: dict, capsys: CaptureFixture
     ) -> None:
         mock_client.get_tasks.return_value = self.SAMPLE_TASKS
         base_args["show_ids"] = True
 
-        cmd_list_tasks(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
+        cmd_tasks(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
 
         output = capsys.readouterr().out
         assert "t1" in output
         assert "t2" in output
 
-    def test_cmd_list_tasks_THEN_records_listing_for_numbered_commands(
+    def test_cmd_tasks_THEN_records_listing_for_numbered_commands(
         self, mock_client: Mock, active_config: Config, base_args: dict
     ) -> None:
         mock_client.get_tasks.return_value = self.SAMPLE_TASKS[:2]
 
-        cmd_list_tasks(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
+        cmd_tasks(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
 
         assert ListingState.default().rows("list1") == [
             {"id": "t1", "title": "Task 1"},
             {"id": "t2", "title": "Task 2"},
         ]
 
-    def test_cmd_list_tasks_GIVEN_no_matching_tasklist_THEN_raises(
+    def test_cmd_tasks_GIVEN_no_matching_tasklist_THEN_raises(
         self, mock_client: Mock, config: Config, base_args: dict
     ) -> None:
         mock_client.get_tasklists.return_value = []
         base_args["tasklist_title"] = "NonExistent"
 
         with pytest.raises(CliError):
-            cmd_list_tasks(argparse.Namespace(**base_args), lambda **_: mock_client, config)
+            cmd_tasks(argparse.Namespace(**base_args), lambda **_: mock_client, config)
 
         mock_client.get_tasks.assert_not_called()
 
 
-class TestCmdListTasklists:
-    """Test the cmd_list_tasklists command handler."""
+class TestCmdLists:
+    """Test the cmd_lists command handler."""
 
     SAMPLE_TASKLISTS = [{"id": "list1", "title": "Work"}, {"id": "list2", "title": "Personal"}]
 
@@ -463,64 +492,79 @@ class TestCmdListTasklists:
     def base_args(self) -> dict:
         return {"limit": None, "show_ids": False}
 
-    def test_cmd_list_tasklists_GIVEN_defaults_THEN_fetches_all(
+    def test_cmd_lists_GIVEN_defaults_THEN_fetches_all(
         self, mock_client: Mock, config: Config, base_args: dict, capsys: CaptureFixture
     ) -> None:
         mock_client.get_tasklists.return_value = self.SAMPLE_TASKLISTS
 
-        cmd_list_tasklists(argparse.Namespace(**base_args), lambda **_: mock_client, config)
+        cmd_lists(argparse.Namespace(**base_args), lambda **_: mock_client, config)
 
-        mock_client.get_tasklists.assert_called_once_with(None)
+        mock_client.get_tasklists.assert_called_once_with()
         output = capsys.readouterr().out
         assert "Work" in output
         assert "Personal" in output
 
-    def test_cmd_list_tasklists_GIVEN_limit_THEN_passes_to_client(
-        self, mock_client: Mock, config: Config, base_args: dict
+    def test_cmd_lists_GIVEN_limit_and_more_lists_THEN_truncates_and_says_so(
+        self, mock_client: Mock, config: Config, base_args: dict, capsys: CaptureFixture
+    ) -> None:
+        mock_client.get_tasklists.return_value = self.SAMPLE_TASKLISTS
+        base_args["limit"] = 1
+
+        cmd_lists(argparse.Namespace(**base_args), lambda **_: mock_client, config)
+
+        output = capsys.readouterr().out
+        assert "Task lists · 1+" in output
+        assert "Personal" not in output
+        assert "More not shown" in output
+
+    def test_cmd_lists_GIVEN_limit_not_reached_THEN_no_truncation_note(
+        self, mock_client: Mock, config: Config, base_args: dict, capsys: CaptureFixture
     ) -> None:
         mock_client.get_tasklists.return_value = self.SAMPLE_TASKLISTS
         base_args["limit"] = 5
 
-        cmd_list_tasklists(argparse.Namespace(**base_args), lambda **_: mock_client, config)
+        cmd_lists(argparse.Namespace(**base_args), lambda **_: mock_client, config)
 
-        mock_client.get_tasklists.assert_called_once_with(5)
+        output = capsys.readouterr().out
+        assert output.splitlines()[0].strip() == "Task lists · 2"
+        assert "More not shown" not in output
 
-    def test_cmd_list_tasklists_GIVEN_active_list_THEN_marks_it(
+    def test_cmd_lists_GIVEN_active_list_THEN_marks_it(
         self, mock_client: Mock, active_config: Config, base_args: dict, capsys: CaptureFixture
     ) -> None:
         mock_client.get_tasklists.return_value = self.SAMPLE_TASKLISTS
 
-        cmd_list_tasklists(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
+        cmd_lists(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
 
         assert "● Work" in capsys.readouterr().out
 
-    def test_cmd_list_tasklists_GIVEN_cached_lists_THEN_heading_says_how_old(
+    def test_cmd_lists_GIVEN_cached_lists_THEN_heading_says_how_old(
         self, mock_client: Mock, config: Config, base_args: dict, capsys: CaptureFixture
     ) -> None:
         mock_client.get_tasklists.return_value = self.SAMPLE_TASKLISTS
         mock_client.tasklists_cache_state.return_value = CacheState(True, 1_000_000.0)
 
         with patch("gtasks.cli.ui.time.time", return_value=1_000_000.0 + 600):
-            cmd_list_tasklists(argparse.Namespace(**base_args), lambda **_: mock_client, config)
+            cmd_lists(argparse.Namespace(**base_args), lambda **_: mock_client, config)
 
         assert "Task lists · 2 · cached 10m ago" in capsys.readouterr().out
 
-    def test_cmd_list_tasklists_GIVEN_active_list_renamed_THEN_refreshes_cached_title(
+    def test_cmd_lists_GIVEN_active_list_renamed_THEN_refreshes_cached_title(
         self, mock_client: Mock, active_config: Config, base_args: dict
     ) -> None:
         mock_client.get_tasklists.return_value = [{"id": "list1", "title": "Job"}]
 
-        cmd_list_tasklists(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
+        cmd_lists(argparse.Namespace(**base_args), lambda **_: mock_client, active_config)
 
         assert active_config.get(ConfigKey.ACTIVE_TASKLIST_TITLE) == "Job"
 
-    def test_cmd_list_tasklists_GIVEN_show_ids_THEN_includes_ids_in_output(
+    def test_cmd_lists_GIVEN_show_ids_THEN_includes_ids_in_output(
         self, mock_client: Mock, config: Config, base_args: dict, capsys: CaptureFixture
     ) -> None:
         mock_client.get_tasklists.return_value = self.SAMPLE_TASKLISTS
         base_args["show_ids"] = True
 
-        cmd_list_tasklists(argparse.Namespace(**base_args), lambda **_: mock_client, config)
+        cmd_lists(argparse.Namespace(**base_args), lambda **_: mock_client, config)
 
         output = capsys.readouterr().out
         assert "list1" in output
@@ -577,6 +621,31 @@ class TestCmdUse:
 
         assert capsys.readouterr().out.splitlines()[0].strip() == "Task lists · 2"
 
+    def test_cmd_use_GIVEN_no_lists_THEN_one_error_and_nothing_printed(
+        self, mock_client: Mock, config: Config, capsys: CaptureFixture
+    ) -> None:
+        mock_client.get_tasklists.return_value = []
+
+        with pytest.raises(CliError) as exc_info:
+            cmd_use(argparse.Namespace(name=None), lambda **_: mock_client, config)
+
+        assert exc_info.value.message == ui.NO_TASKLISTS
+        assert capsys.readouterr().out == ""
+
+    def test_cmd_use_GIVEN_picker_and_active_list_renamed_THEN_stored_title_updated(
+        self, mock_client: Mock, active_config: Config
+    ) -> None:
+        mock_client.get_tasklists.return_value = [
+            {"id": "list1", "title": "Work (renamed)"},
+            {"id": "list2", "title": "Home"},
+        ]
+
+        with patch("builtins.input", return_value="q"), pytest.raises(Cancelled):
+            cmd_use(argparse.Namespace(name=None), lambda **_: mock_client, active_config)
+
+        # The picker shows lists the same way `lists` does, title sync included.
+        assert active_config.get(ConfigKey.ACTIVE_TASKLIST_TITLE) == "Work (renamed)"
+
     def test_cmd_use_GIVEN_picker_cancelled_THEN_raises_cancelled(
         self, mock_client: Mock, config: Config
     ) -> None:
@@ -598,9 +667,7 @@ class TestCmdUse:
         cmd_use(argparse.Namespace(name="work"), get_client, config)
 
         get_client.assert_called_once_with()  # cached like bare `gtasks`; --refresh forces fresh
-        mock_client.get_tasks.assert_called_once_with(
-            "list1", DEFAULT_LIMIT + 1, show_completed=False
-        )
+        mock_client.get_tasks.assert_called_once_with("list1", show_completed=False)
         lines = [line.strip() for line in capsys.readouterr().out.splitlines()]
         assert lines[0] == "✓ Active list: Work"
         assert lines[1].startswith("Work · 1 open")
@@ -726,6 +793,16 @@ class TestCmdDone:
         mock_client.complete_tasks.assert_called_once_with("list1", ["task1"])
         assert "✓ Completed Buy milk · Work" in capsys.readouterr().out
 
+    def test_cmd_done_GIVEN_untitled_task_THEN_confirms_it_as_untitled(
+        self, mock_client: Mock, active_config: Config, capsys: CaptureFixture
+    ) -> None:
+        # Google sends an untitled task with an empty title, not a missing one.
+        mock_client.get_tasks.return_value = [{"id": "t1", "title": "", "status": "needsAction"}]
+
+        cmd_done(argparse.Namespace(tasks=["1"]), lambda **_: mock_client, active_config)
+
+        assert "✓ Completed (untitled) · Work" in capsys.readouterr().out
+
     def test_cmd_done_GIVEN_multiple_indices_THEN_completes_all_and_summarises(
         self, mock_client: Mock, active_config: Config, capsys: CaptureFixture
     ) -> None:
@@ -791,7 +868,7 @@ class TestFreshReads:
         get_client = Mock(return_value=mock_client)
         args = argparse.Namespace(tasklist_title=None, limit=None, show_ids=False)
 
-        cmd_list_tasks(args, get_client, active_config)
+        cmd_tasks(args, get_client, active_config)
 
         get_client.assert_called_once_with()
 

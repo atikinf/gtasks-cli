@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING
 from gtasks.cli import ui
 from gtasks.cli.cli_utils import add_shared_option, prompt_index_choice
 from gtasks.cli.errors import Cancelled, CliError
+from gtasks.cli.task_order import display_order
 from gtasks.cli.title_matching import TitleMatch, match_titles
 from gtasks.client.protocol import DEFAULT_TASKLIST_ID
 from gtasks.utils.config import LEGACY_DEFAULT_TASKLIST_KEY, Config, ConfigKey
@@ -120,7 +121,7 @@ def add_tasklist_option(parser: argparse.ArgumentParser, *, top_level: bool = Fa
         default=None,
         dest="tasklist_title",
         metavar="LIST",
-        help=f"task list to act on (default: ${ENV_VAR}, else the active list)",
+        help=f"Task list to act on (default: ${ENV_VAR}, else the active list)",
     )
     attach(action, complete_tasklists)
 
@@ -207,7 +208,8 @@ def resolve_tasks_from_inputs(
     def open_tasks() -> list:
         nonlocal current
         if current is None:
-            current = client.get_tasks(tasklist_id, show_completed=False)
+            # Displayed order, so numbers without a recorded listing match `gtasks tasks`.
+            current = display_order(client.get_tasks(tasklist_id, show_completed=False))
         return current
 
     for inp in inputs:

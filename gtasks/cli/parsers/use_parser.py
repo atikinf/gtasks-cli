@@ -8,10 +8,11 @@ from rich.text import Text
 from gtasks.cli import ui
 from gtasks.cli.cli_utils import add_refresh_option, prompt_index_choice
 from gtasks.cli.completion import attach, complete_tasklists
-from gtasks.cli.errors import Cancelled, CliError
+from gtasks.cli.errors import Cancelled
+from gtasks.cli.parsers.lists_parser import show_tasklists
 from gtasks.cli.parsers.tasks_parser import DEFAULT_LIMIT, show_tasks
 from gtasks.cli.title_id_resolution import TargetList, find_tasklist, set_active_tasklist
-from gtasks.utils.config import Config, ConfigKey
+from gtasks.utils.config import Config
 
 if TYPE_CHECKING:
     from gtasks.client.protocol import ClientProvider
@@ -21,15 +22,7 @@ def cmd_use(args: argparse.Namespace, get_client: "ClientProvider", cfg: Config)
     """Handle the 'use' command to set the active task list, then show it."""
     client = get_client()
     if args.name is None:
-        tasklists = client.get_tasklists()
-        if not tasklists:
-            raise CliError("You have no task lists.")
-        ui.render_tasklists(
-            tasklists,
-            heading="Task lists",
-            active_id=cfg.get(ConfigKey.ACTIVE_TASKLIST_ID),
-            cache=client.tasklists_cache_state(),
-        )
+        tasklists = show_tasklists(client, cfg, require_any=True)
         choice = prompt_index_choice(len(tasklists), "Make which list active?", input)
         if choice is None:
             raise Cancelled()

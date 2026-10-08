@@ -285,6 +285,18 @@ class TestResolveTasksFromInputs:
         assert result.tasks == [self.SAMPLE_TASKS[0]]
         mock_client.get_tasks.assert_called_once_with("list1", show_completed=False)
 
+    def test_GIVEN_index_and_no_listing_THEN_counts_in_displayed_order(
+        self, mock_client: Mock
+    ) -> None:
+        mock_client.get_tasks.return_value = [
+            {"id": "later", "title": "B", "position": "00000000000000000001"},
+            {"id": "first", "title": "A", "position": "00000000000000000000"},
+        ]
+
+        result = resolve_tasks_from_inputs(["1"], mock_client, "list1")
+
+        assert [t["id"] for t in result.tasks] == ["first"]
+
     def test_GIVEN_multiple_indices_THEN_resolves_all(
         self, mock_client: Mock
     ) -> None:

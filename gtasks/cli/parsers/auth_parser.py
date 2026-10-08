@@ -51,7 +51,7 @@ def add_subparser_auth(subparsers) -> None:
     """Add the 'auth' subcommand to configure OAuth credentials."""
     auth_parser = subparsers.add_parser(
         "auth",
-        help="Setup Google OAuth credentials",
+        help="Set up Google OAuth credentials",
         description="Interactively enter your Google OAuth client ID and secret to authenticate.",
     )
     auth_parser.set_defaults(func=cmd_auth)

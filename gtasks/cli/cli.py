@@ -3,14 +3,14 @@
 import argparse
 
 from gtasks.cli.cli_utils import add_refresh_option
-from gtasks.cli.parsers.add_parser import add_subparser_add_task
+from gtasks.cli.parsers.add_parser import add_subparser_add
 from gtasks.cli.parsers.auth_parser import add_subparser_auth
 from gtasks.cli.parsers.completion_parser import add_subparser_completion
 from gtasks.cli.parsers.config_parser import add_subparser_config
 from gtasks.cli.parsers.delete_parser import add_subparser_delete
 from gtasks.cli.parsers.done_parser import add_subparser_done
 from gtasks.cli.parsers.lists_parser import add_subparser_lists
-from gtasks.cli.parsers.tasks_parser import DEFAULT_LIMIT, add_subparser_tasks, cmd_list_tasks
+from gtasks.cli.parsers.tasks_parser import DEFAULT_LIMIT, add_subparser_tasks, cmd_tasks
 from gtasks.cli.parsers.use_parser import add_subparser_use
 from gtasks.cli.title_id_resolution import add_tasklist_option
 
@@ -34,7 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # Default: bare `gtasks` shows the first 10 tasks from the active list.
     parser.set_defaults(
-        func=cmd_list_tasks,
+        func=cmd_tasks,
         limit=DEFAULT_LIMIT,
         show_ids=False,
     )
@@ -47,7 +47,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     add_subparser_tasks(subparsers)
     add_subparser_lists(subparsers)
-    add_subparser_add_task(subparsers)
+    add_subparser_add(subparsers)
     add_subparser_use(subparsers)
     add_subparser_done(subparsers)
     add_subparser_delete(subparsers)

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from gtasks.cli import ui
 from gtasks.cli.cli_utils import add_refresh_option
+from gtasks.cli.task_order import display_order
 from gtasks.cli.title_id_resolution import (
     TargetList,
     add_tasklist_option,
@@ -20,7 +21,7 @@ if TYPE_CHECKING:
 DEFAULT_LIMIT = 10
 
 
-def cmd_list_tasks(args: argparse.Namespace, get_client: "ClientProvider", cfg: Config) -> None:
+def cmd_tasks(args: argparse.Namespace, get_client: "ClientProvider", cfg: Config) -> None:
     """Handle the 'tasks' command (and bare `gtasks`) to display open tasks."""
     client = get_client()
     target = resolve_target_tasklist(args, client, cfg)
@@ -30,14 +31,14 @@ def cmd_list_tasks(args: argparse.Namespace, get_client: "ClientProvider", cfg: 
 def show_tasks(
     client: "TasksClient", target: TargetList, *, limit: int | None, show_ids: bool = False
 ) -> None:
-    """Fetch and print a list's open tasks, and record the listing so `done 3` / `delete 3`
-    hit what was shown."""
+    """Fetch and print a list's open tasks in the app's order (subtasks under their parent),
+    and record the listing so `done 3` / `delete 3` hit what was shown."""
     # TODO: "show completed" mode — fetch needsAction tasks here, then read
     # recently completed tasks from a local cache (populated by `gtasks done`)
     # to append as strikethrough, avoiding a second API call. Configurable via `gtasks config`.
-    # Fetch one extra row to learn whether the limit hid anything.
-    fetch_limit = limit + 1 if limit is not None else None
-    tasks = client.get_tasks(target.id, fetch_limit, show_completed=False)
+    # The whole list: the API's order (most recently updated first) isn't the displayed one,
+    # so the limit can only apply after ordering. (The cache fetches it all regardless.)
+    tasks = display_order(client.get_tasks(target.id, show_completed=False))
     truncated = limit is not None and len(tasks) > limit
     tasks = tasks[:limit] if truncated else tasks
 
@@ -69,7 +70,7 @@ def add_subparser_tasks(subparsers) -> None:
     tasks_parser.add_argument(
         "--show-ids",
         action="store_true",
-        help="Include task IDs in output",
+        help="Include task IDs in the output",
     )
     add_refresh_option(tasks_parser)
-    tasks_parser.set_defaults(func=cmd_list_tasks)
+    tasks_parser.set_defaults(func=cmd_tasks)
