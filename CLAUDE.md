@@ -221,4 +221,7 @@ and `~/.cache`.
 - ruff: line-length 100, rules `E,F,I,W`, `gtasks` as first-party for isort.
 - Tests: `test_<fn>_GIVEN_<condition>_THEN_<result>` naming, grouped in `Test*` classes, with a
   `MagicMock` service fixture per module. `tests/conftest.py` holds only the autouse
-  output/env/cache-dir isolation fixture; other fixtures stay per-module.
+  output/env/config-and-cache-dir isolation fixture. Tests mirror the package layout: one file
+  per command in `tests/cli/parsers/` (`test_<name>_parser.py`, its arg parsing and `cmd_<name>`),
+  whose `conftest.py` holds the fixtures they share (`config`, `active_config`, `mock_client`,
+  `parser`); other fixtures stay per-module.
