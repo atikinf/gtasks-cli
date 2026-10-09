@@ -48,8 +48,10 @@ def build_tasks_resource(creds: Credentials, timeout: float | None = None) -> "T
     """
     from googleapiclient.discovery import build
 
+    # No discovery cache: its file cache needs oauth2client < 4 and, missing that, logs a
+    # line on every build (visible on the MCP server's stderr).
     if timeout is None:
-        return build("tasks", "v1", credentials=creds)
+        return build("tasks", "v1", credentials=creds, cache_discovery=False)
 
     import httplib2
     from google_auth_httplib2 import AuthorizedHttp
@@ -57,7 +59,7 @@ def build_tasks_resource(creds: Credentials, timeout: float | None = None) -> "T
     http = AuthorizedHttp(creds, http=httplib2.Http(timeout=timeout))
     # AuthorizedHttp is the documented way to pass credentials with a custom Http, but the
     # stubs only accept a plain httplib2.Http here.
-    return build("tasks", "v1", http=cast(httplib2.Http, http))
+    return build("tasks", "v1", http=cast(httplib2.Http, http), cache_discovery=False)
 
 
 def build_client(

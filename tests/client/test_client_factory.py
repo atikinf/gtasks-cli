@@ -334,7 +334,9 @@ class TestBuildTasksResource:
 
         build_tasks_resource(creds)
 
-        mock_build.assert_called_once_with("tasks", "v1", credentials=creds)
+        mock_build.assert_called_once_with(
+            "tasks", "v1", credentials=creds, cache_discovery=False
+        )
 
     @patch("googleapiclient.discovery.build")
     @patch("httplib2.Http")
@@ -348,4 +350,6 @@ class TestBuildTasksResource:
 
         mock_http.assert_called_once_with(timeout=10)
         mock_authed.assert_called_once_with(creds, http=mock_http.return_value)
-        mock_build.assert_called_once_with("tasks", "v1", http=mock_authed.return_value)
+        mock_build.assert_called_once_with(
+            "tasks", "v1", http=mock_authed.return_value, cache_discovery=False
+        )

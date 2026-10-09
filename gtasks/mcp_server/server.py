@@ -14,6 +14,7 @@ aren't thread-safe) under a lock (two threads mustn't refresh and rewrite the sa
 Writes act on IDs, so they're safe whatever the cache held when the model read them.
 """
 
+import importlib.metadata
 import re
 import sys
 import threading
@@ -190,7 +191,7 @@ def _client_errors() -> Iterator[None]:
 
 def build_server(get_client: "ClientProvider") -> MCPServer:
     """The server with its tools, acting through `get_client` (injected so tests can mock)."""
-    server = MCPServer("gtasks", instructions=INSTRUCTIONS)
+    server = MCPServer("gtasks", instructions=INSTRUCTIONS, version=_version())
 
     # --- Reads -----------------------------------------------------------------------------
 
@@ -406,6 +407,13 @@ def build_server(get_client: "ClientProvider") -> MCPServer:
             return {"id": tasklist["id"], "title": tasklist.get("title", "")}
 
     return server
+
+
+def _version() -> str:
+    try:
+        return importlib.metadata.version("gtasks-cli")
+    except importlib.metadata.PackageNotFoundError:  # running from an uninstalled checkout
+        return ""
 
 
 def _make_client_provider() -> "ClientProvider":

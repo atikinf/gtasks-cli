@@ -67,7 +67,6 @@ Install [`uv`](https://docs.astral.sh/uv/) (`brew install uv` on macOS), then fr
 * `uv run pytest` runs tests
 
 **TODO**:
-* Verify `gtasks auth` end-to-end functionality.
 * Add undo functionality, store recent history on disk for undo purposes.
 * Add task editing — no way to fix a title/notes/due date typo today without deleting and recreating the task.
 * Add tasklist management (`gtasks add-list`, delete a list) — lists can currently only be created/removed from the Google Tasks web UI/app; this CLI only manages tasks within existing lists.
