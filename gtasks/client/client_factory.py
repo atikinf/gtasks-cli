@@ -128,26 +128,40 @@ def _load_or_refresh_creds(
     return new_creds
 
 
-def auth(token_path: Path, client_id: str, client_secret: str) -> Credentials:
-    """Authenticate using an inline client ID/secret (used by `gtasks auth`)."""
+def sign_in(token_path: Path, client_id: str, client_secret: str) -> Credentials:
+    """Run the browser sign-in with an inline client ID/secret (`gtasks auth`), always.
+
+    The saved token is replaced only once the sign-in succeeds, so a cancelled or failed one
+    leaves the previous sign-in working.
+    """
     from google_auth_oauthlib.flow import InstalledAppFlow
 
-    return _load_or_refresh_creds(
-        token_path,
-        lambda: InstalledAppFlow.from_client_config(
-            client_config={
-                "installed": {
-                    "client_id": client_id,
-                    "client_secret": client_secret,
-                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-                    "redirect_uris": ["http://localhost"],
-                }
-            },
-            scopes=SCOPES,
-        ),
+    flow = InstalledAppFlow.from_client_config(
+        client_config={
+            "installed": {
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                "redirect_uris": ["http://localhost"],
+            }
+        },
+        scopes=SCOPES,
     )
+    creds: Credentials = flow.run_local_server()
+    write_creds_to_file(creds, token_path)
+    return creds
+
+
+def refresh_saved_sign_in(token_path: Path) -> Credentials:
+    """The saved sign-in, refreshed if expired. Never opens a browser: raises
+    `SignInRequiredError` if there's none or it no longer works (e.g. revoked)."""
+
+    def no_flow() -> InstalledAppFlow:
+        raise SignInRequiredError("No usable saved sign-in")
+
+    return _load_or_refresh_creds(token_path, no_flow)
 
 
 def auth_from_file(

@@ -8,7 +8,7 @@ interpolated into rich markup, so a title like "[urgent] pay rent" renders verba
 """
 
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import date, datetime, timezone
 from typing import TYPE_CHECKING, Any
 
@@ -91,6 +91,14 @@ def raw(text: str) -> None:
     file = out().file
     file.write(text if text.endswith("\n") else text + "\n")
     file.flush()
+
+
+def ask(prompt: Text, input_fn: Callable[[str], str] | None = None) -> str:
+    """Read a line after a styled `prompt`. An injected `input_fn` (tests) gets the plain text;
+    otherwise `input` is looked up at call time, so patching it works."""
+    if input_fn is not None:
+        return input_fn(prompt.plain)
+    return out().input(prompt)
 
 
 def error(message: str, hint: str | None = None) -> None:

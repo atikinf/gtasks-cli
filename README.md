@@ -4,7 +4,9 @@ A simple Google Tasks CLI.
 
 ### Setup
 
-You need your own Google OAuth client: in the [Google Cloud console](https://console.cloud.google.com/apis/credentials), enable the Tasks API and create an OAuth client ID (type: Desktop app). Then run `gtasks auth` and paste in the client ID and secret. See [gcalcli's auth docs](https://github.com/insanum/gcalcli/blob/HEAD/docs/api-auth.md) for a walkthrough of a similar setup.
+gtasks uses your own (free) Google OAuth client. In the [Google Cloud console](https://console.cloud.google.com/), enable the Google Tasks API, add yourself as a test user, and create an OAuth client of type *Desktop app*; then run `gtasks auth` and paste in its client ID and secret.
+
+**[docs/setup.md](docs/setup.md)** walks through every step, including how to avoid re-signing in every 7 days, and troubleshooting.
 
 ### Usage
 
@@ -65,7 +67,6 @@ Install [`uv`](https://docs.astral.sh/uv/) (`brew install uv` on macOS), then fr
 * `uv run pytest` runs tests
 
 **TODO**:
-* **High Prio:** Add better doc explaining how to download/configure a `credentials.json` for new users. À la [gcalcli](https://github.com/insanum/gcalcli/blob/HEAD/docs/api-auth.md).
 * Verify `gtasks auth` end-to-end functionality.
 * Add undo functionality, store recent history on disk for undo purposes.
 * Add task editing — no way to fix a title/notes/due date typo today without deleting and recreating the task.

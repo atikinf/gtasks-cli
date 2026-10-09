@@ -122,7 +122,7 @@ class TestMainClientConstruction:
                 "gtasks.cli.parsers.auth_parser.prompt_setup_credentials",
                 return_value=("id", "secret"),
             ),
-            patch("gtasks.cli.parsers.auth_parser.auth"),
+            patch("gtasks.cli.parsers.auth_parser.sign_in"),
         ):
             assert main(["auth"]) == 0
 

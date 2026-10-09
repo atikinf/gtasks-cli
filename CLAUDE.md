@@ -98,8 +98,12 @@ stderr. Errors bubble up untouched and are mapped to messages only there. Signed
 end in a `gtasks auth` hint via `_report_signed_out`: `SignInRequiredError` (raised by
 `client_factory` when there's no usable token and no `credentials.json`), a mid-request
 `RefreshError`, and HTTP 401. The client layer raises its own exception and never imports from
-`cli/`. A failed token refresh falls back to a fresh sign-in, so `gtasks auth` can always
-replace a revoked token.
+`cli/`. A failed token refresh falls back to a fresh sign-in. `gtasks auth` offers the saved client as
+dimmed prompt defaults (`mask_client_id`: `1234...-...abcd.apps…`; `mask_secret`: last 4, as
+the Cloud console shows it), read through `ui.ask` (styled prompt, `input` looked up at call time);
+keeping both and declining "sign in again" only refreshes the token (`refresh_saved_sign_in`),
+otherwise `client_factory.sign_in` always runs the browser flow and replaces `token.json` only
+on success.
 `tests/conftest.py` installs plain, uncoloured consoles (via `ui.use_consoles`), clears
 `$GTASKS_LIST` and points `defaults.CONFIG_DIR` and `defaults.CACHE_DIR` at tmp dirs for every
 test, so output assertions

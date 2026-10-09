@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import pytest
 from rich.console import Console
+from rich.text import Text
 
 from gtasks.cli import ui
 from gtasks.client.protocol import CacheState
@@ -242,3 +243,24 @@ class TestMessages:
 
         assert _text(consoles[0]) == ""
         assert _text(consoles[1]).splitlines() == ["error: bad thing", "hint: do this"]
+
+
+class TestAsk:
+    def test_ask_GIVEN_input_fn_THEN_called_with_plain_prompt(self) -> None:
+        seen: list[str] = []
+
+        def fake_input(prompt: str) -> str:
+            seen.append(prompt)
+            return "answer"
+
+        assert ui.ask(Text.assemble("Q ", ("[default]", "muted"), ": "), fake_input) == "answer"
+        assert seen == ["Q [default]: "]
+
+    def test_ask_GIVEN_no_input_fn_THEN_prints_prompt_and_reads_input(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        with patch("builtins.input", return_value="answer"):
+            assert ui.ask(Text("Q: ")) == "answer"
+
+        assert capsys.readouterr().out == "Q: "
+
